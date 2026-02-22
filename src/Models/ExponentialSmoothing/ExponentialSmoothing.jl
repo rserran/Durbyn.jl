@@ -14,6 +14,9 @@ import ..Stats: handle_missing, MissingMethod, Contiguous, Interpolate, FailMiss
 import ..Generics: Forecast, forecast, plot, fitted
 import ..Optimize: nelder_mead, NelderMeadOptions, scaler, descaler
 
+include("ets_types.jl")
+include("ets_recursion.jl")
+include("ets_hw_conventional.jl")
 include("ets_utils.jl")
 include("ets.jl")
 include("holt.jl")

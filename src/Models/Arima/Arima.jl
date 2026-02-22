@@ -25,6 +25,9 @@ import ..Optimize: optimize, numerical_hessian
 import ..Grammar: ModelFormula, ArimaOrderTerm, VarTerm, compile_arima_formula
 
 import Base: show
+include("arima_types.jl")
+include("kalman.jl")
+include("arima_covariance.jl")
 include("arima_base.jl")
 include("arima_rjh.jl")
 include("auto_arima_utils.jl")
