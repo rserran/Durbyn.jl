@@ -52,13 +52,14 @@ julia> collect(head(v))
  6
 
 julia> M = reshape(1:12, 3, 4);
+
 julia> collect(head(M, 2))        # first 2 rows
-2x4 Matrix{Int64}:
+2×4 Matrix{Int64}:
  1  4  7  10
  2  5  8  11
 
 julia> collect(head(M, 2; dims=2)) # first 2 columns
-3x2 Matrix{Int64}:
+3×2 Matrix{Int64}:
  1  4
  2  5
  3  6
@@ -131,16 +132,17 @@ julia> collect(tail(v))
  10
 
 julia> M = reshape(1:12, 3, 4);
+
 julia> collect(tail(M, 2))        # last 2 rows
-2x4 Matrix{Int64}:
-  2   5   8  11
-  3   6   9  12
+2×4 Matrix{Int64}:
+ 2  5  8  11
+ 3  6  9  12
 
 julia> collect(tail(M, 3; dims=2)) # last 3 columns
-3x3 Matrix{Int64}:
-  2   5   8
-  3   6   9
-  4   7  10
+3×3 Matrix{Int64}:
+ 4  7  10
+ 5  8  11
+ 6  9  12
 ```
 """
 function tail(A::AbstractArray, n::Integer=6; dims::Integer=1)
