@@ -87,8 +87,6 @@ export select, query, arrange, groupby, mutate, summarise, summarize, pivot_long
 export acf, pacf, ACFResult, PACFResult, interpolate_missing, longest_contiguous, check_missing, handle_missing
 export MissingMethod, Contiguous, Interpolate, FailMissing
 
-include("glimpse_extensions.jl")
-
 function __init__()
     @info """Durbyn.jl is under active development.
     API may change without notice. Bugs and performance issues may exist.

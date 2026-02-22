@@ -1,7 +1,3 @@
-import .TableOps: glimpse
-import .ModelSpecs: GroupedFittedModels, GroupedForecasts, successful_models, failed_groups, errors
-import Tables
-
 function glimpse(io::IO, fitted::GroupedFittedModels; maxgroups::Integer = 5)
     println(io, "GroupedFittedModels glimpse")
     println(io, "  Target: ", fitted.spec.formula.target)

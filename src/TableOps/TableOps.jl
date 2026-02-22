@@ -1,7 +1,8 @@
 module TableOps
 
 using Tables
-import ..ModelSpecs: ForecastModelCollection, as_table, PanelData
+import ..ModelSpecs: ForecastModelCollection, as_table, PanelData,
+                     GroupedFittedModels, GroupedForecasts, successful_models, failed_groups, errors
 
 export select, query, arrange, groupby, mutate, summarise, summarize, pivot_longer, pivot_wider, glimpse
 export GroupedTable
@@ -15,5 +16,6 @@ export separate, unite, fill_missing, complete
 export inner_join, left_join, right_join, full_join, semi_join, anti_join
 
 include("ops.jl")
+include("glimpse_extensions.jl")
 
 end
