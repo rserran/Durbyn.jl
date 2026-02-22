@@ -564,7 +564,7 @@ autocor(resid, 1:20) |> plot
 ```julia
 model = tbats(y, m)
 
-println("AIC: ", model.AIC)
+println("AIC: ", model.aic)
 println("Log-likelihood: ", model.likelihood)
 println("Parameters: ", length(model.parameters[:vect]))
 println("States: ", size(model.seed_states, 1))
