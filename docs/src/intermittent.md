@@ -263,10 +263,10 @@ The `IntermittentDemand` module provides three main functions that implement the
 All methods support the following parameters aligned with Kourentzes (2014) findings:
 
 - **`cost_metric`**: Loss function for optimization
-  - `"mar"` (recommended): Mean Absolute Rate error
-  - `"msr"` (recommended): Mean Squared Rate error
-  - `"mae"`: Mean Absolute Error (classical)
-  - `"mse"`: Mean Squared Error (classical)
+  - `:mar` (recommended): Mean Absolute Rate error
+  - `:msr` (recommended): Mean Squared Rate error
+  - `:mae`: Mean Absolute Error (classical)
+  - `:mse`: Mean Squared Error (classical)
 
 - **`number_of_params`**: Number of smoothing parameters
   - `1`: Single parameter for both size and interval
@@ -277,8 +277,8 @@ All methods support the following parameters aligned with Kourentzes (2014) find
   - `false`: Use heuristic initialization
 
 - **`init_strategy`**: Initialization method
-  - `"mean"` (default): Use mean of non-zero values and intervals
-  - `"naive"`: Use first observed values
+  - `:mean` (default): Use mean of non-zero values and intervals
+  - `:naive`: Use first observed values
 
 ### Implementation Notes
 
@@ -301,21 +301,21 @@ data = [6, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 0, 0, 0]
 
 # Classical Croston method (using recommended MAR cost metric)
-fit_croston = croston_classic(data, cost_metric = "mar")
+fit_croston = croston_classic(data, cost_metric = :mar)
 fc_croston = forecast(fit_croston, h = 12)
 
 # Syntetos-Boylan Approximation with separate smoothing parameters
-fit_sba = croston_sba(data, cost_metric = "mar", number_of_params = 2)
+fit_sba = croston_sba(data, cost_metric = :mar, number_of_params = 2)
 fc_sba = forecast(fit_sba, h = 12)
 
 # Shale-Boylan-Johnston method with initial state optimization
-fit_sbj = croston_sbj(data, cost_metric = "mar", optimize_init = true)
+fit_sbj = croston_sbj(data, cost_metric = :mar, optimize_init = true)
 fc_sbj = forecast(fit_sbj, h = 12)
 
 # Alternative cost metrics (classical - use with caution)
-fit_mse = croston_classic(data, cost_metric = "mse")  # Traditional MSE
-fit_mae = croston_classic(data, cost_metric = "mae")  # Traditional MAE
-fit_msr = croston_classic(data, cost_metric = "msr")  # Mean Squared Rate
+fit_mse = croston_classic(data, cost_metric = :mse)  # Traditional MSE
+fit_mae = croston_classic(data, cost_metric = :mae)  # Traditional MAE
+fit_msr = croston_classic(data, cost_metric = :msr)  # Mean Squared Rate
 
 # Visualization
 plot(fc_croston, show_fitted = true)

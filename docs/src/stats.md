@@ -40,13 +40,13 @@ y^{(\lambda)} = \begin{cases}
 Automatically select the optimal Box-Cox transformation parameter.
 
 ```julia
-box_cox_lambda(x, m; method="guerrero", lower=-1, upper=2)
+box_cox_lambda(x, m; method=:guerrero, lower=-1, upper=2)
 ```
 
 **Arguments:**
 - `x::AbstractVector`: A numeric vector (must be positive for Guerrero method)
 - `m::Int`: Frequency of the data
-- `method::String`: Selection method - `"guerrero"` (default) or `"loglik"`
+- `method::Symbol`: Selection method - `:guerrero` (default) or `:loglik`
 - `lower::Float64`: Lower bound for λ search (default: -1)
 - `upper::Float64`: Upper bound for λ search (default: 2)
 
@@ -59,7 +59,7 @@ box_cox_lambda(x, m; method="guerrero", lower=-1, upper=2)
 using Durbyn.Stats
 
 y = [120, 135, 148, 152, 141, 158, 170, 165, 180, 195]
-lambda = box_cox_lambda(y, 12, method="guerrero")
+lambda = box_cox_lambda(y, 12, method=:guerrero)
 ```
 
 ### `box_cox`
@@ -67,19 +67,19 @@ lambda = box_cox_lambda(y, 12, method="guerrero")
 Apply Box-Cox transformation to a series.
 
 ```julia
-box_cox(x, m; lambda="auto")
+box_cox(x, m; lambda=:auto)
 ```
 
 **Arguments:**
 - `x::AbstractVector`: Input vector
 - `m::Int`: Frequency
-- `lambda`: Transformation parameter or `"auto"` for automatic selection
+- `lambda`: Transformation parameter or `:auto` for automatic selection
 
 **Returns:** Tuple `(transformed_vector, lambda_used)`
 
 **Example:**
 ```julia
-y_transformed, lambda = box_cox(y, 12; lambda="auto")
+y_transformed, lambda = box_cox(y, 12; lambda=:auto)
 ```
 
 ### `box_cox!`
@@ -129,13 +129,13 @@ y_mean = inv_box_cox(y_transformed; lambda=0.5, biasadj=true, fvar=forecast_vari
 Decompose a time series into trend, seasonal, and residual components using moving averages.
 
 ```julia
-decompose(x; m, type="additive", filter=nothing)
+decompose(x; m, type=:additive, filter=nothing)
 ```
 
 **Arguments:**
 - `x::AbstractVector`: Time series vector
 - `m::Int`: Frequency (observations per cycle)
-- `type::String`: `"additive"` or `"multiplicative"`
+- `type::Symbol`: `:additive` or `:multiplicative`
 - `filter`: Custom filter coefficients (optional)
 
 **Returns:** `DecomposedTimeSeries` struct with fields:
@@ -152,7 +152,7 @@ decompose(x; m, type="additive", filter=nothing)
 using Durbyn.Stats
 
 ap = air_passengers()
-result = decompose(ap; m=12, type="multiplicative")
+result = decompose(ap; m=12, type=:multiplicative)
 result.trend
 result.seasonal
 ```
@@ -214,7 +214,7 @@ mstl(x, m; lambda=nothing, iterate=2, s_window=nothing, stl_kwargs...)
 **Arguments:**
 - `x::AbstractVector`: Time series
 - `m`: Single period (Int) or vector of periods
-- `lambda`: Box-Cox parameter (`nothing`, `"auto"`, or numeric)
+- `lambda`: Box-Cox parameter (`nothing`, `:auto`, or numeric)
 - `iterate::Int`: Number of outer iterations (default: 2)
 - `s_window`: Seasonal window(s)
 - `stl_kwargs...`: Additional arguments passed to `stl`
@@ -794,7 +794,7 @@ D = nsdiffs(ap, 12)
 println("Non-seasonal differences: $d, Seasonal differences: $D")
 
 # 2. Apply Box-Cox transformation
-y_transformed, lambda = box_cox(ap, 12; lambda="auto")
+y_transformed, lambda = box_cox(ap, 12; lambda=:auto)
 println("Box-Cox lambda: $lambda")
 
 # 3. Decompose the series

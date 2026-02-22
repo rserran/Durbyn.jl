@@ -37,7 +37,7 @@ export scaler, descaler
 The `optimize` function provides a unified interface for all solvers, allowing easy switching between methods.
 
 ```julia
-optimize(x0, fn; grad=nothing, method="Nelder-Mead", lower=-Inf, upper=Inf,
+optimize(x0, fn; grad=nothing, method=:nelder_mead, lower=-Inf, upper=Inf,
          control=Dict(), hessian=false, kwargs...)
 ```
 
@@ -49,11 +49,11 @@ optimize(x0, fn; grad=nothing, method="Nelder-Mead", lower=-Inf, upper=Inf,
 ### Keyword Arguments
 
 - `grad::Union{Function,Nothing}`: Gradient function, called as `grad(x; kwargs...)`. If `nothing`, numerical gradients are computed automatically.
-- `method::String`: Optimization method:
-  - `"Nelder-Mead"` (default) - Derivative-free simplex
-  - `"BFGS"` - Quasi-Newton with line search
-  - `"L-BFGS-B"` - Limited-memory BFGS with box constraints
-  - `"Brent"` - 1D optimization (scalar `x0` only)
+- `method::Symbol`: Optimization method:
+  - `:nelder_mead` (default) - Derivative-free simplex
+  - `:bfgs` - Quasi-Newton with line search
+  - `:lbfgsb` - Limited-memory BFGS with box constraints
+  - `:brent` - 1D optimization (scalar `x0` only)
 - `lower`, `upper`: Bounds for L-BFGS-B and Brent methods
 - `control::Dict`: Control parameters (see below)
 - `hessian::Bool`: If `true`, compute Hessian at solution
@@ -107,27 +107,27 @@ result = optimize([-1.2, 1.0], rosenbrock)
 println("Optimal: $(result.par), Value: $(result.value)")
 
 # BFGS with analytical gradient
-result = optimize([-1.2, 1.0], rosenbrock; grad=rosenbrock_grad, method="BFGS")
+result = optimize([-1.2, 1.0], rosenbrock; grad=rosenbrock_grad, method=:bfgs)
 
 # BFGS with numerical gradient (automatic)
-result = optimize([-1.2, 1.0], rosenbrock; method="BFGS")
+result = optimize([-1.2, 1.0], rosenbrock; method=:bfgs)
 
 # L-BFGS-B with box constraints
-result = optimize([0.5, 0.5], rosenbrock; method="L-BFGS-B",
+result = optimize([0.5, 0.5], rosenbrock; method=:lbfgsb,
                   lower=[0.0, 0.0], upper=[2.0, 2.0])
 
 # With control parameters
-result = optimize([-1.2, 1.0], rosenbrock; method="BFGS",
+result = optimize([-1.2, 1.0], rosenbrock; method=:bfgs,
                   control=Dict("trace" => 1, "maxit" => 500, "gtol" => 1e-6))
 
 # Request Hessian at solution
 result = optimize([-1.2, 1.0], rosenbrock; grad=rosenbrock_grad,
-                  method="BFGS", hessian=true)
+                  method=:bfgs, hessian=true)
 println("Hessian:\n$(result.hessian)")
 
 # 1D optimization with Brent's method
 f1d(x) = (x[1] - 2)^2
-result = optimize([0.0], f1d; method="Brent", lower=-5.0, upper=5.0)
+result = optimize([0.0], f1d; method=:brent, lower=-5.0, upper=5.0)
 ```
 
 ---
@@ -571,7 +571,7 @@ end
 # Optimize with BFGS
 result = optimize([0.0, 0.0], neg_loglik;
                   grad=neg_loglik_grad,
-                  method="BFGS",
+                  method=:bfgs,
                   hessian=true)
 
 # Extract estimates

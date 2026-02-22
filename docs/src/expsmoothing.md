@@ -428,7 +428,7 @@ Handle non-constant variance with Box-Cox transformation:
 ```julia
 # Automatic lambda selection
 spec = EtsSpec(@formula(sales = e("A") + t("A") + s("M")))
-fitted = fit(spec, data, m = 12, lambda = "auto", biasadj = true)
+fitted = fit(spec, data, m = 12, lambda = :auto, biasadj = true)
 
 # Check selected lambda
 println(fitted.fit.lambda)
@@ -442,7 +442,7 @@ println(fitted_lambda.fit.lambda)
 ```
 
 **Transformation features:**
-- `lambda = "auto"` selects optimal transformation
+- `lambda = :auto` selects optimal transformation
 - `biasadj = true` applies bias adjustment to forecasts
 - Common values: 0 (log), 0.5 (square root), 1 (no transform)
 
@@ -504,8 +504,8 @@ In practice, ``\alpha`` is typically constrained to ``(0,1)`` for conventional e
 
 The `ses()` function provides two initialization methods:
 
-- **`initial = "optimal"`** (default): Uses state-space optimization via ETS framework
-- **`initial = "simple"`**: Uses conventional Holt-Winters initialization
+- **`initial = :optimal`** (default): Uses state-space optimization via ETS framework
+- **`initial = :simple`**: Uses conventional Holt-Winters initialization
 
 ```julia
 using Durbyn
@@ -543,7 +543,7 @@ The `SES` struct contains:
 - **`initstate`**: Initial level estimate
 - **`states`**: Level estimates over time
 - **`sigma2`**: Residual variance
-- **`aic`, `bic`, `aicc`**: Information criteria (when `initial = "optimal"`)
+- **`aic`, `bic`, `aicc`**: Information criteria (when `initial = :optimal`)
 - **`mse`, `amse`**: Mean squared error measures
 - **`lambda`**: Box-Cox transformation parameter (if used)
 - **`biasadj`**: Boolean flag for bias adjustment
@@ -676,10 +676,10 @@ fit_fixed = holt(y, alpha=0.8, beta=0.2)
 fit_exp = holt(y, exponential=true)
 
 # With Box-Cox transformation
-fit_bc = holt(y, lambda="auto", biasadj=true)
+fit_bc = holt(y, lambda=:auto, biasadj=true)
 
 # Simple initialization
-fit_simple = holt(y, initial="simple")
+fit_simple = holt(y, initial=:simple)
 
 # Can also specify m explicitly (though typically not needed)
 fit_explicit = holt(y, 1, damped=true)
@@ -696,7 +696,7 @@ The `Holt` struct contains:
 - **`initstate`**: Initial level and trend estimates
 - **`states`**: Level and trend estimates over time
 - **`sigma2`**: Residual variance
-- **`aic`, `bic`, `aicc`**: Information criteria (when `initial = "optimal"`)
+- **`aic`, `bic`, `aicc`**: Information criteria (when `initial = :optimal`)
 - **`mse`, `amse`**: Mean squared error measures
 - **`lambda`**: Box-Cox transformation parameter (if used)
 - **`biasadj`**: Boolean flag for bias adjustment
@@ -744,7 +744,7 @@ fc2 = forecast(fit2, h=12)
 plot(fc2)
 
 # Use a damped trend search and automatic Box–Cox selection
-fit3 = ets(ap, 12, "ZZZ"; damped=nothing, lambda="auto", biasadj=true)
+fit3 = ets(ap, 12, "ZZZ"; damped=nothing, lambda=:auto, biasadj=true)
 fc3 = forecast(fit3, h=12)
 plot(fc3)
 ```

@@ -281,7 +281,7 @@ fit = diffusion(y, model_type=Bass, w=(m=500.0, p=0.03, q=0.38))
 fit = diffusion(y, model_type=Bass, initpar=[500.0, 0.03, 0.38])
 
 # Use preset initialization
-fit = diffusion(y, model_type=Bass, initpar="preset")
+fit = diffusion(y, model_type=Bass, initpar=:preset)
 ```
 
 ### Loss Functions
@@ -314,7 +314,7 @@ fit = diffusion(y, cleanlead=false)
 # Custom optimization settings
 fit = diffusion(y,
     model_type=Bass,
-    method="L-BFGS-B",     # Optimization algorithm
+    method=:lbfgsb,        # Optimization algorithm
     maxiter=1000,          # Maximum iterations
     mscal=true,            # Scale market potential for stability
     cumulative=true        # Optimize on cumulative values
@@ -544,8 +544,8 @@ weibull_init(y) -> NamedTuple
 | `cumulative` | `Bool` | `true` | Optimize on cumulative values |
 | `mscal` | `Bool` | `true` | Scale market parameter |
 | `maxiter` | `Int` | `500` | Maximum iterations |
-| `method` | `String` | `"L-BFGS-B"` | Optimization method |
-| `initpar` | `String` or `Vector` | `"linearize"` | Initialization method |
+| `method` | `Symbol` | `:lbfgsb` | Optimization method |
+| `initpar` | `Symbol` or `Vector` | `:linearize` | Initialization method |
 
 ---
 

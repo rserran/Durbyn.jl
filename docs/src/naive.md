@@ -333,7 +333,7 @@ fit = naive(y; lambda = 0.0)
 fit = naive(y; lambda = 0.5)
 
 # Automatic lambda selection
-fit = naive(y; lambda = "auto")
+fit = naive(y; lambda = :auto)
 
 # With bias adjustment for back-transformation
 fit = naive(y; lambda = 0.0, biasadj = true)

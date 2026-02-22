@@ -188,7 +188,7 @@ Construct the specification with your formula and optional keywords (passed thro
 spec = EtsSpec(
     @formula(sales = e("Z") + t("A") + s("A") + drift()),
     m = 12,           # seasonal period
-    ic = "aicc"       # information criterion for model selection
+    ic = :aicc        # information criterion for model selection
 )
 
 fitted = fit(spec, (sales = sales_vec,); m = 12)
@@ -236,7 +236,7 @@ ses_spec = SesSpec(@formula(value = ses()))
 holt_spec = HoltSpec(@formula(value = holt(damped=true)))
 
 # Holt-Winters with multiplicative seasonality
-hw_spec = HoltWintersSpec(@formula(value = hw(seasonal="multiplicative")), m = 12)
+hw_spec = HoltWintersSpec(@formula(value = hw(seasonal=:multiplicative)), m = 12)
 
 # Croston's intermittent-demand method
 croston_spec = CrostonSpec(@formula(demand = croston()))
@@ -264,7 +264,7 @@ models = model(
     EtsSpec(@formula(value = e("Z") + t("Z") + s("Z") + drift(:auto))),
     SesSpec(@formula(value = ses())),
     HoltSpec(@formula(value = holt(damped=true))),
-    HoltWintersSpec(@formula(value = hw(seasonal="multiplicative")); m = 12),
+    HoltWintersSpec(@formula(value = hw(seasonal=:multiplicative)); m = 12),
     CrostonSpec(@formula(value = croston())),
     names = ["arima", "bats", "ets_auto", "ses", "holt_damped", "hw_mul", "croston"]
 )
@@ -753,18 +753,18 @@ The `croston()` term supports multiple method variants and configuration options
 @formula(demand = croston())
 
 # Syntetos-Boylan Approximation - RECOMMENDED (bias-corrected)
-@formula(demand = croston(method="sba"))
+@formula(demand = croston(method=:sba))
 
 # Shale-Boylan-Johnston - Alternative bias correction
-@formula(demand = croston(method="sbj"))
+@formula(demand = croston(method=:sbj))
 
 # Classical Croston (1972) - Original method with modern optimization
-@formula(demand = croston(method="classic"))
+@formula(demand = croston(method=:classic))
 
 # With custom optimization parameters (IntermittentDemand module)
 @formula(demand = croston(
-    method="sba",
-    cost_metric="mar",
+    method=:sba,
+    cost_metric=:mar,
     number_of_params=2,
     optimize_init=true
 ))
@@ -778,38 +778,38 @@ Four Croston method variants are available:
 
 | Method | Description | Module | Best For | Bias Correction |
 |--------|-------------|--------|----------|-----------------|
-| `"sba"` ⭐ | Syntetos-Boylan Approximation | IntermittentDemand | **Default choice** - bias-corrected, best accuracy | `1 - α/2` |
-| `"sbj"` | Shale-Boylan-Johnston | IntermittentDemand | Alternative if SBA over-forecasts | `1 - α/(2-α)` |
-| `"classic"` | Classical Croston (1972) | IntermittentDemand | Original method with modern optimization | None (biased) |
-| `"hyndman"` | Croston (Shenstone & Hyndman 2005) | ExponentialSmoothing | Standard implementation, fixed alpha | None |
+| `:sba` | Syntetos-Boylan Approximation | IntermittentDemand | **Default choice** - bias-corrected, best accuracy | `1 - α/2` |
+| `:sbj` | Shale-Boylan-Johnston | IntermittentDemand | Alternative if SBA over-forecasts | `1 - α/(2-α)` |
+| `:classic` | Classical Croston (1972) | IntermittentDemand | Original method with modern optimization | None (biased) |
+| `:hyndman` | Croston (Shenstone & Hyndman 2005) | ExponentialSmoothing | Standard implementation, fixed alpha | None |
 
 **Why Bias Correction Matters:**
 The classical Croston method systematically over-forecasts due to Jensen's inequality when computing the ratio of smoothed demand to smoothed intervals. Both SBA and SBJ apply correction factors to reduce this bias, with empirical studies showing significant accuracy improvements.
 
-**Recommendation**: Start with `method="sba"` - it's the most validated and generally performs best. Only consider SBJ if SBA shows consistent over-forecasting in your validation studies.
+**Recommendation**: Start with `method=:sba` - it's the most validated and generally performs best. Only consider SBJ if SBA shows consistent over-forecasting in your validation studies.
 
 ### IntermittentDemand Parameters
 
-When using `"classic"`, `"sba"`, or `"sbj"` methods, additional parameters control the optimization process (based on Kourentzes 2014 recommendations):
+When using `:classic`, `:sba`, or `:sbj` methods, additional parameters control the optimization process (based on Kourentzes 2014 recommendations):
 
 ```julia
 @formula(demand = croston(
-    method = "sba",                  # Method variant
-    cost_metric = "mar",             # Loss function: "mar", "msr", "mae", "mse"
+    method = :sba,                   # Method variant
+    cost_metric = :mar,              # Loss function: :mar, :msr, :mae, :mse
     number_of_params = 2,            # 1 or 2 smoothing parameters
     optimize_init = true,            # Optimize initial states
-    init_strategy = "mean",          # "mean" or "naive" initialization
+    init_strategy = :mean,           # :mean or :naive initialization
     rm_missing = false               # Remove missing values
 ))
 ```
 
 **Parameter Details:**
 
-- **`cost_metric`** (default: `"mar"`): Optimization loss function
-  - `"mar"`: Mean Absolute Rate error (recommended)
-  - `"msr"`: Mean Squared Rate error (recommended)
-  - `"mae"`: Mean Absolute Error (classical)
-  - `"mse"`: Mean Squared Error (classical)
+- **`cost_metric`** (default: `:mar`): Optimization loss function
+  - `:mar`: Mean Absolute Rate error (recommended)
+  - `:msr`: Mean Squared Rate error (recommended)
+  - `:mae`: Mean Absolute Error (classical)
+  - `:mse`: Mean Squared Error (classical)
 
 - **`number_of_params`** (default: `2`): Number of smoothing parameters
   - `1`: Single parameter for both demand size and intervals
@@ -819,15 +819,15 @@ When using `"classic"`, `"sba"`, or `"sbj"` methods, additional parameters contr
   - `true`: Optimize starting values (recommended, especially for short series)
   - `false`: Use heuristic initialization
 
-- **`init_strategy`** (default: `"mean"`): Initial value strategy
-  - `"mean"`: Use mean of non-zero demands and intervals
-  - `"naive"`: Use first observed values
+- **`init_strategy`** (default: `:mean`): Initial value strategy
+  - `:mean`: Use mean of non-zero demands and intervals
+  - `:naive`: Use first observed values
 
 - **`rm_missing`** (default: `false`): Handle missing values
   - `true`: Remove missing observations
   - `false`: Keep all observations
 
-**Note:** These parameters only apply to `"classic"`, `"sba"`, and `"sbj"` methods. They are ignored for `method="hyndman"`.
+**Note:** These parameters only apply to `:classic`, `:sba`, and `:sbj` methods. They are ignored for `method=:hyndman`.
 
 ### Direct Formula Fitting
 
@@ -840,20 +840,20 @@ using Durbyn
 data = (demand = [6, 0, 0, 1, 0, 0, 0, 0, 2, 0, 0, 1, 0, 0, 2, 0, 0, 0, 3, 0],)
 
 # Recommended: Syntetos-Boylan Approximation (bias-corrected)
-spec = CrostonSpec(@formula(demand = croston(method="sba")))
+spec = CrostonSpec(@formula(demand = croston(method=:sba)))
 fit_sba = fit(spec, data)
 fc_sba = forecast(fit_sba, h = 12)
 plot(fc_sba)
 
 # Alternative: Shale-Boylan-Johnston correction
-spec_sbj = CrostonSpec(@formula(demand = croston(method="sbj")))
+spec_sbj = CrostonSpec(@formula(demand = croston(method=:sbj)))
 fit_sbj = fit(spec_sbj, data)
 fc_sbj = forecast(fit_sbj, h = 12)
 
 # Classical Croston with custom optimization parameters
 spec_classic = CrostonSpec(@formula(demand = croston(
-    method = "classic",
-    cost_metric = "msr",        # Mean Squared Rate
+    method = :classic,
+    cost_metric = :msr,         # Mean Squared Rate
     number_of_params = 2,       # Separate smoothing parameters
     optimize_init = true        # Optimize initial values
 )))
@@ -868,8 +868,8 @@ println("Classic forecast: ", mean(fc_classic.mean))
 
 **Implementation Details:**
 `CrostonSpec` automatically routes to the appropriate estimator:
-- `method = "hyndman"` → `ExponentialSmoothing.croston` (simple baseline)
-- `method = "classic"`, `"sba"`, `"sbj"` → `Durbyn.IntermittentDemand` (advanced methods with optimization)
+- `method = :hyndman` → `ExponentialSmoothing.croston` (simple baseline)
+- `method = :classic`, `:sba`, `:sbj` → `Durbyn.IntermittentDemand` (advanced methods with optimization)
 
 No additional modules need to be loaded beyond `using Durbyn`.
 
@@ -885,7 +885,7 @@ using Durbyn, CSV, Downloads, Tables
 panel = PanelData(tbl; groupby = :product_id, date = :date)
 
 # Fit SBA to all products (automatically parallelized)
-spec = CrostonSpec(@formula(demand = croston(method="sba")))
+spec = CrostonSpec(@formula(demand = croston(method=:sba)))
 fitted = fit(spec, panel)
 
 # Generate forecasts for all products
@@ -903,9 +903,9 @@ Compare Croston variants with other forecasting methods:
 ```julia
 # Define multiple models
 models = model(
-    CrostonSpec(@formula(demand = croston(method="sba"))),
-    CrostonSpec(@formula(demand = croston(method="sbj"))),
-    CrostonSpec(@formula(demand = croston(method="classic"))),
+    CrostonSpec(@formula(demand = croston(method=:sba))),
+    CrostonSpec(@formula(demand = croston(method=:sbj))),
+    CrostonSpec(@formula(demand = croston(method=:classic))),
     SesSpec(@formula(demand = ses())),
     EtsSpec(@formula(demand = e("Z") + t("Z") + s("N"))),
     names = ["croston_sba", "croston_sbj", "croston_classic", "ses", "ets"]
@@ -937,13 +937,13 @@ plot(fc, series = "product_123", actual = test_data)
 - Specialty products with infrequent sales
 
 **Method selection:**
-- **`"sba"`** (Syntetos-Boylan Approximation): Best choice for most applications
-- **`"sbj"`** (Shale-Boylan-Johnston): Alternative bias correction, try if SBA underperforms
-- **`"classic"`**: Historical comparison or when bias correction is not needed
-- **`"hyndman"`**: Quick baseline, simpler implementation
+- **`:sba`** (Syntetos-Boylan Approximation): Best choice for most applications
+- **`:sbj`** (Shale-Boylan-Johnston): Alternative bias correction, try if SBA underperforms
+- **`:classic`**: Historical comparison or when bias correction is not needed
+- **`:hyndman`**: Quick baseline, simpler implementation
 
 **Parameter recommendations (Kourentzes 2014):**
-- Use `cost_metric = "mar"` or `"msr"` instead of classical MSE/MAE
+- Use `cost_metric = :mar` or `:msr` instead of classical MSE/MAE
 - Enable `number_of_params = 2` for separate smoothing of size and intervals
 - Set `optimize_init = true` especially for short time series
 - Let optimization run without restrictive parameter bounds
