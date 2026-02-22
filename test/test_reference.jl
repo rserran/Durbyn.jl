@@ -131,7 +131,7 @@ const SES_MAPE = 8.96
         ap = AirPassengers
 
         @testset "Additive Holt-Winters" begin
-            fit = es_holt_winters(ap, 12; seasonal="additive")
+            fit = es_holt_winters(ap, 12; seasonal=:additive)
             fc = forecast(fit; h=12)
 
             @test all(isfinite.(fc.mean))
@@ -140,7 +140,7 @@ const SES_MAPE = 8.96
         end
 
         @testset "Multiplicative Holt-Winters" begin
-            fit = es_holt_winters(ap, 12; seasonal="multiplicative")
+            fit = es_holt_winters(ap, 12; seasonal=:multiplicative)
             fc = forecast(fit; h=12)
 
             @test all(isfinite.(fc.mean))
@@ -149,7 +149,7 @@ const SES_MAPE = 8.96
         end
 
         @testset "Seasonal pattern preservation" begin
-            fit = es_holt_winters(ap, 12; seasonal="multiplicative")
+            fit = es_holt_winters(ap, 12; seasonal=:multiplicative)
             fc = forecast(fit; h=24)
 
             july_idx = [7, 19]

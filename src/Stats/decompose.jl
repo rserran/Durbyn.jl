@@ -9,7 +9,7 @@ A structure representing a decomposed time series, which includes the original t
 - `trend::AbstractVector`: The trend component of the time series.
 - `random::AbstractVector`: The random or residual component of the time series.
 - `figure::AbstractVector`: The estimated seasonal figure only.
-- `type::String`: A string indicating the type of decomposition or any other relevant type information.
+- `type::Symbol`: A symbol indicating the type of decomposition (`:additive` or `:multiplicative`).
 - `m::Int`: The frequency of the x.
 
 # Example
@@ -19,7 +19,7 @@ seasonal = [0.1, 0.2, 0.1, 0.2, 0.1]
 trend = [0.5, 1.0, 1.5, 2.0, 2.5]
 random = [0.4, 0.8, 1.4, 1.8, 2.4]
 figure = []
-type = "Additive"
+type = :additive
 m = 2
 ```
 """
@@ -29,7 +29,7 @@ struct DecomposedTimeSeries
     trend::AbstractVector
     random::AbstractVector
     figure::AbstractVector
-    type::String
+    type::Symbol
     m::Int
 end
 
@@ -124,7 +124,7 @@ end
 
 
 """
- decompose(;x::Vector, m::Int, type::String, filter)
+ decompose(;x::Vector, m::Int, type::Symbol, filter)
  
  Classical Seasonal Decomposition by Moving Averages
 
@@ -142,7 +142,7 @@ end
  # Arguments
  - `x::AbstractVector`: A AbstractVector of one time series.
  - `m::Int`: The frequency of the time serie
- - `type::String`: The type of seasonal component. Can be either additive or multiplicative.
+ - `type::Symbol`: The type of seasonal component. Can be either `:additive` or `:multiplicative`.
  - `filter`: A AbstractVector of filter coefficients in reverse time order 
  (as for AR or MA coefficients), used for filtering out the seasonal component.
   If NULL, a moving average with symmetric window is performed.
@@ -150,26 +150,26 @@ end
  # Examples
  ```julia-repl
  julia> ap = air_passengers();
- julia> decompose(x = ap, m = 12, type= "multiplicative", filter = NaN)
- julia> decompose(x = ap, m = 12, type= "additive", filter = NaN)
+ julia> decompose(x = ap, m = 12, type= :multiplicative, filter = NaN)
+ julia> decompose(x = ap, m = 12, type= :additive, filter = NaN)
  
  ```
  """
 function decompose(;
     x::AbstractVector,
     m::Int,
-    type::String = "additive",
+    type::Symbol = :additive,
     filter::Union{Nothing,AbstractVector} = nothing,
 )
 
     n = length(x)
     
     if m <= 1 || length([v for v in x if !isbad(v)]) < 2 * m
-        error("time series has no or less than 2 periods")
+        throw(ArgumentError("time series has no or less than 2 periods"))
     end
-    t = lowercase(type)
-    if t != "additive" && t != "multiplicative"
-        error("type must be \"additive\" or \"multiplicative\"")
+    t = type
+    if t !== :additive && t !== :multiplicative
+        throw(ArgumentError("type must be :additive or :multiplicative"))
     end
 
     w = if isnothing(filter)
@@ -182,7 +182,7 @@ function decompose(;
 
     xf = Float64.(x)
     season_pre = similar(trend)
-    if t == "additive"
+    if t === :additive
         @inbounds for i = 1:n
             xv = xf[i]
             tv = trend[i]
@@ -204,7 +204,7 @@ function decompose(;
     end
  
     μfig = mean_skip(figure)
-    if t == "additive"
+    if t === :additive
         figure .= figure .- μfig
     else
         figure .= figure ./ μfig
@@ -214,7 +214,7 @@ function decompose(;
     seasonal = repeat(figure, rep)[1:n]
 
     random = similar(trend)
-    if t == "additive"
+    if t === :additive
         @inbounds for i = 1:n
             xv = xf[i]
             sv = seasonal[i]

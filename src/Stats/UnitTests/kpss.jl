@@ -25,8 +25,8 @@ end
 function _kpss(y, type::Symbol=:mu, lags::Symbol=:short, use_lag::Union{Nothing,Int}=nothing)
     yv = _skipmissing_to_vec(y)
     n = length(yv)
-    type in (:mu, :tau) || error("type must be :mu or :tau")
-    lags in (:short, :long, :nil) || error("lags must be :short, :long, or :nil")
+    type in (:mu, :tau) || throw(ArgumentError("type must be :mu or :tau"))
+    lags in (:short, :long, :nil) || throw(ArgumentError("lags must be :short, :long, or :nil"))
 
     lmax =
         if !isnothing(use_lag)
@@ -73,8 +73,6 @@ end
 
 """
     kpss(y; type::Symbol = :mu, lags::Symbol = :short, use_lag::Union{Nothing,Int} = nothing)
-
-    kpss(;y, type::String = "mu", lags::String = "short", use_lag::Union{Nothing,Int} = nothing)
 
 Perform the KPSS unit root test, where the **null hypothesis is stationarity**.
 
@@ -130,13 +128,6 @@ function kpss(y; type::Symbol=:mu, lags::Symbol=:short, use_lag::Union{Nothing,I
     _kpss(y, type, lags, use_lag)
 end
 
-function kpss(;y, type::String = "mu", lags::String = "short", use_lag::Union{Nothing,Int} = nothing)
-    type = match_arg(type, ["mu", "tau"])
-    lags = match_arg(lags, ["short", "long", "nil"])
-    type_sym = Symbol(lowercase(type))
-    lags_sym = Symbol(lowercase(lags))
-    return _kpss(y, type_sym, lags_sym, use_lag)
-end
 
 "Approximate p-value for KPSS by linear interpolation between critical values."
 pvalue(u::KPSS) = _pvalue_from_cvals(u.teststat, u.cval, u.clevels)

@@ -250,7 +250,7 @@ const EPS = 1e-6
             forecast_vec = [10.0, 20.0, 30.0]
             actual_vec = [12.0, 18.0]
 
-            @test_throws ErrorException accuracy(forecast_vec, actual_vec)
+            @test_throws ArgumentError accuracy(forecast_vec, actual_vec)
         end
 
         @testset "GroupedForecasts requires table" begin
@@ -260,7 +260,7 @@ const EPS = 1e-6
             )
             actual_vec = [1.0, 2.0, 3.0]
 
-            @test_throws ErrorException accuracy(fc, actual_vec)
+            @test_throws ArgumentError accuracy(fc, actual_vec)
         end
     end
 
@@ -284,7 +284,7 @@ const EPS = 1e-6
         )
 
         # Should error when asking for columns that don't exist
-        @test_throws ErrorException _index_actual_by_groups(ct, :value, [:series, :region])
+        @test_throws ArgumentError _index_actual_by_groups(ct, :value, [:series, :region])
     end
 
     @testset "Time column mismatch warning" begin

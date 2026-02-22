@@ -2,9 +2,9 @@ sinpi(x) = sin(pi * x)
 cospi(x) = cos(pi * x)
 
 function base_fourier(x, K, times, period)
-    @assert length(period) == length(K) "Number of periods does not match number of orders"
+    length(period) == length(K) || throw(ArgumentError("Number of periods does not match number of orders"))
         
-    @assert !any(2 .* K .> period) "K must not be greater than period/2"
+    !any(2 .* K .> period) || throw(ArgumentError("K must not be greater than period/2"))
     
     p = Float64[]
     labels = String[]
@@ -65,10 +65,10 @@ println(result)
 function fourier(x::Vector{T}; m::Int, K::Int, h::Union{Int, Nothing}=nothing) where T
     if isnothing(h)
         out = base_fourier(x, [K], 1:length(x), [m])
-        @assert size(out) == (size(x, 1), 2 * K) "Dimentions are wrong!"
+        size(out) == (size(x, 1), 2 * K) || throw(ArgumentError("Dimensions are wrong"))
     else
         out = base_fourier(x, [K], length(x) .+ (1:h), [m])
-        @assert size(out) == (h, 2 * K) "Dimentions are wrong!"
+        size(out) == (h, 2 * K) || throw(ArgumentError("Dimensions are wrong"))
     end
     
     return out

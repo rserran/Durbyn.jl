@@ -139,7 +139,7 @@ const THETA_LOWER = 0.5
             fit = auto_theta(ap, 12)
 
             @test fit.decompose == true
-            @test fit.decomposition_type in ["additive", "multiplicative"]
+            @test fit.decomposition_type in (:additive, :multiplicative)
             @test !isnothing(fit.seasonal_component)
         end
 
@@ -284,25 +284,25 @@ const THETA_LOWER = 0.5
         ap = AirPassengers
 
         @testset "Multiplicative decomposition" begin
-            fit = auto_theta(ap, 12; decomposition_type="multiplicative")
+            fit = auto_theta(ap, 12; decomposition_type=:multiplicative)
 
             if fit.decompose
-                @test fit.decomposition_type == "multiplicative"
+                @test fit.decomposition_type === :multiplicative
             end
         end
 
         @testset "Additive decomposition" begin
-            fit = auto_theta(ap, 12; decomposition_type="additive")
+            fit = auto_theta(ap, 12; decomposition_type=:additive)
 
             if fit.decompose
-                @test fit.decomposition_type == "additive"
+                @test fit.decomposition_type === :additive
             end
         end
 
         @testset "Fallback for non-positive data" begin
             data_with_negative = vcat(ap[1:50], -ap[51:100], ap[101:end])
 
-            fit = auto_theta(data_with_negative .+ 1000, 12; decomposition_type="multiplicative")
+            fit = auto_theta(data_with_negative .+ 1000, 12; decomposition_type=:multiplicative)
             @test isfinite(fit.mse)
         end
     end

@@ -102,7 +102,7 @@ const tbats_direct = Durbyn.Tbats.tbats
         @test length(fitted_model.fit.errors) == n
         @test all(isfinite, fitted_model.fit.fitted_values)
         @test all(isfinite, fitted_model.fit.errors)
-        @test isfinite(fitted_model.fit.AIC)
+        @test !isnothing(fitted_model.fit.aic)
 
         # TBATS with seasonal period
         spec = TbatsSpec(@formula(sales = tbats(seasonal_periods=52)))

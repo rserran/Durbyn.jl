@@ -13,7 +13,7 @@ This is useful for rescaling optimization parameters.
 - Scaled parameter vector.
 """
 function scaler(x::AbstractVector, scale::AbstractVector)
-    @assert length(x) == length(scale)
+    length(x) == length(scale) || throw(ArgumentError("x and scale must have the same length"))
     return x ./ scale
 end
 
@@ -32,6 +32,6 @@ This undoes the scaling performed by `scaler`.
 - Original, unscaled parameter vector.
 """
 function descaler(x_scaled::AbstractVector, scale::AbstractVector)
-    @assert length(x_scaled) == length(scale)
+    length(x_scaled) == length(scale) || throw(ArgumentError("x_scaled and scale must have the same length"))
     return x_scaled .* scale
 end

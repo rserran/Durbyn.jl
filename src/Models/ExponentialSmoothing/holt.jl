@@ -16,20 +16,20 @@ forecasts from trending indefinitely.
 - `components::Vector{Any}`: Model components (level and trend).
 - `x::AbstractArray`: The original time series data.
 - `par::Any`: Dictionary containing model parameters (alpha, beta, phi if damped).
-- `loglik::Union{Float64,Int}`: Log-likelihood of the model.
+- `loglik::Float64`: Log-likelihood of the model.
 - `initstate::AbstractArray`: Initial state estimates (initial level and trend).
 - `states::AbstractArray`: Level and trend estimates over time.
 - `state_names::Any`: Names of the state variables.
-- `SSE::Union{Float64,Int}`: Sum of squared errors, a measure of model fit.
-- `sigma2::Union{Float64,Int}`: Residual variance (σ²).
+- `sse::Float64`: Sum of squared errors, a measure of model fit.
+- `sigma2::Float64`: Residual variance (σ²).
 - `m::Int`: Seasonal period (typically 1 for non-seasonal data).
 - `lambda::Union{Float64,Bool,Nothing}`: Box-Cox transformation parameter (nothing if not used).
 - `biasadj::Bool`: Boolean flag indicating whether bias adjustment was applied.
-- `aic::Union{Float64,Int}`: Akaike Information Criterion for model selection.
-- `bic::Union{Float64,Int}`: Bayesian Information Criterion for model selection.
-- `aicc::Union{Float64,Int}`: Corrected AIC for small sample sizes.
-- `mse::Union{Float64,Int}`: Mean Squared Error of the model fit.
-- `amse::Union{Float64,Int}`: Average Mean Squared Error.
+- `aic::Float64`: Akaike Information Criterion for model selection.
+- `bic::Float64`: Bayesian Information Criterion for model selection.
+- `aicc::Float64`: Corrected AIC for small sample sizes.
+- `mse::Float64`: Mean Squared Error of the model fit.
+- `amse::Float64`: Average Mean Squared Error.
 - `fit::Any`: The fitted model object.
 - `method::String`: The method used for model fitting (e.g., "Holt's method", "Damped Holt's method").
 
@@ -40,32 +40,32 @@ forecasts from trending indefinitely.
 struct Holt
     fitted::AbstractArray
     residuals::AbstractArray
-    components::Vector{Any}
+    components::Vector{String}
     x::AbstractArray
-    par::Any
-    loglik::Union{Float64,Int}
+    par::Dict{String,Any}
+    loglik::Float64
     initstate::AbstractArray
     states::AbstractArray
-    state_names::Any
-    SSE::Union{Float64,Int}
-    sigma2::Union{Float64,Int}
+    state_names::Vector{String}
+    sse::Float64
+    sigma2::Float64
     m::Int
     lambda::Union{Float64,Bool,Nothing}
     biasadj::Bool
-    aic::Union{Float64,Int}
-    bic::Union{Float64,Int}
-    aicc::Union{Float64,Int}
-    mse::Union{Float64,Int}
-    amse::Union{Float64,Int}
-    fit::Any
+    aic::Float64
+    bic::Float64
+    aicc::Float64
+    mse::Float64
+    amse::Float64
+    fit::Union{Dict{String,Any}, Nothing}
     method::String
 end
 
 """
-    holt(y; damped=false, initial="optimal", exponential=false, alpha=nothing,
+    holt(y; damped=false, initial=:optimal, exponential=false, alpha=nothing,
          beta=nothing, phi=nothing, lambda=nothing, biasadj=false,
          options=NelderMeadOptions())
-    holt(y, m; damped=false, initial="optimal", exponential=false, alpha=nothing,
+    holt(y, m; damped=false, initial=:optimal, exponential=false, alpha=nothing,
          beta=nothing, phi=nothing, lambda=nothing, biasadj=false,
          options=NelderMeadOptions())
 
@@ -86,10 +86,10 @@ seasonality using two smoothing equations: one for the level and one for the tre
 # Keyword Arguments
 - `damped::Bool=false`: If `true`, applies damping to the trend component using parameter φ.
   Damped trends prevent forecasts from trending indefinitely into the future.
-- `initial::String="optimal"`: Initialization method:
-  - `"optimal"`: Uses state-space optimization via ETS framework (default).
-  - `"simple"`: Uses conventional Holt-Winters initialization.
-  Note: Damped trends require `"optimal"` initialization.
+- `initial::Symbol=:optimal`: Initialization method:
+  - `:optimal`: Uses state-space optimization via ETS framework (default).
+  - `:simple`: Uses conventional Holt-Winters initialization.
+  Note: Damped trends require `:optimal` initialization.
 - `exponential::Bool=false`: If `true`, uses exponential (multiplicative) trend instead of additive.
 - `alpha::Union{Float64,Nothing}=nothing`: Level smoothing parameter (0 < α < 1).
   If `nothing`, α is estimated from the data.
@@ -99,7 +99,7 @@ seasonality using two smoothing equations: one for the level and one for the tre
   If `nothing`, φ is estimated from the data.
 - `lambda::Union{Float64,Bool,Nothing}=nothing`: Box-Cox transformation parameter.
   - `nothing`: No transformation (default).
-  - `"auto"` or `true`: Automatically select optimal λ.
+  - `:auto` or `true`: Automatically select optimal λ.
   - `Float64`: Use specified λ value.
 - `biasadj::Bool=false`: Apply bias adjustment for Box-Cox back-transformation.
 - `options::NelderMeadOptions`: Optimization options for parameter estimation.
@@ -167,7 +167,7 @@ fit_exp = holt(y, exponential=true)
 fit_bc = holt(y, lambda=0.5, biasadj=true)
 
 # Simple initialization
-fit_simple = holt(y, initial="simple")
+fit_simple = holt(y, initial=:simple)
 
 # Note: For consistency in comparisons, use the same form
 # Either always omit m: holt(y) or always specify it: holt(y, 1)
@@ -203,7 +203,7 @@ Use Holt's linear trend method when:
 function holt(
     y::AbstractArray;
     damped::Bool = false,
-    initial::String = "optimal",
+    initial::Symbol = :optimal,
     exponential::Bool = false,
     alpha::Union{Float64,Bool,Nothing} = nothing,
     beta::Union{Float64,Bool,Nothing} = nothing,
@@ -221,7 +221,7 @@ function holt(
     y::AbstractArray,
     m::Int;
     damped::Bool = false,
-    initial::String = "optimal",
+    initial::Symbol = :optimal,
     exponential::Bool = false,
     alpha::Union{Float64,Bool,Nothing} = nothing,
     beta::Union{Float64,Bool,Nothing} = nothing,
@@ -232,7 +232,7 @@ function holt(
 
 )
 
-    initial = match_arg(initial, ["optimal", "simple"])
+    initial = _check_arg(initial, (:optimal, :simple), "initial")
     model = nothing
 
     if length(y) <= 1
@@ -243,7 +243,7 @@ function holt(
         )
     end
 
-    if initial == "optimal" || damped
+    if initial === :optimal || damped
         if exponential
             model = ets_base_model(
                 y,
@@ -253,7 +253,7 @@ function holt(
                 beta = beta,
                 phi = phi,
                 damped = damped,
-                opt_crit = "mse",
+                opt_crit = :mse,
                 lambda = lambda,
                 biasadj = biasadj,
                 options = options,
@@ -267,7 +267,7 @@ function holt(
                 beta = beta,
                 phi = phi,
                 damped = damped,
-                opt_crit = "mse",
+                opt_crit = :mse,
                 lambda = lambda,
                 biasadj = biasadj,
                 options = options
@@ -290,7 +290,7 @@ function holt(
 
     if damped
         method = "Damped Holt's method"
-        if initial == "simple"
+        if initial === :simple
             @warn "Damped Holt's method requires optimal initialization"
         end
     else
@@ -308,7 +308,7 @@ function holt(
     aicc = hasfield(typeof(model), :aicc) ? model.aicc : NaN
     mse = hasfield(typeof(model), :mse) ? model.mse : NaN
     amse = hasfield(typeof(model), :amse) ? model.amse : NaN
-    fit = hasfield(typeof(model), :fit) ? model.fit : Float64[]
+    fit = hasfield(typeof(model), :fit) ? model.fit : nothing
 
     return Holt(
         model.fitted,
@@ -320,7 +320,7 @@ function holt(
         model.initstate,
         model.states,
         model.state_names,
-        model.SSE,
+        model.sse,
         model.sigma2,
         model.m,
         model.lambda,

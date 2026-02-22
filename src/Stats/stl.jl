@@ -468,7 +468,7 @@ end
 function check_degree(deg, name::AbstractString)
     d = Int(deg)
     if d < 0 || d > 1
-        error("$name must be 0 or 1")
+        throw(ArgumentError("$name must be 0 or 1"))
     end
     return d
 end
@@ -539,13 +539,13 @@ function stl(
 
     n = length(x)
     if m < 2 || n <= 2 * m
-        error("series is not periodic or has less than two periods")
+        throw(ArgumentError("series is not periodic or has less than two periods"))
     end
 
     if any(ismissing, x)
-        error(
+        throw(ArgumentError(
             "Input data contains missing values; consider imputing or removing them before calling stl",
-        )
+        ))
     end
 
     periodic = false
@@ -557,7 +557,7 @@ function stl(
             s_window_val = 10 * n + 1
             s_degree = 0
         else
-            error("unknown string value for s_window: $s_window")
+            throw(ArgumentError("unknown string value for s_window: $s_window"))
         end
     elseif isa(s_window, Integer)
         s_window_val = nextodd(s_window)

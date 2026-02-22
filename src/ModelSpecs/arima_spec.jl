@@ -89,7 +89,7 @@ spec = ArimaSpec(
 spec = ArimaSpec(
     @formula(sales = p() + q()),
     m = 12,
-    method = "CSS-ML",
+    method = :css_ml,
     lambda = :auto
 )
 ```
@@ -162,7 +162,7 @@ fc = forecast(fitted, h = 12)
 """
 struct FittedArima <: AbstractFittedModel
     spec::ArimaSpec
-    fit::Any
+    fit::ArimaFit
     target_col::Symbol
     xreg_cols::Vector{Symbol}
     data_schema::Dict{Symbol, Type}

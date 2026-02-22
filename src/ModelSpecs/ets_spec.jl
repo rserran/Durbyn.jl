@@ -49,7 +49,7 @@ Container for ETS models fitted via `EtsSpec`.
 """
 struct FittedEts <: AbstractFittedModel
     spec::EtsSpec
-    fit::Any
+    fit::EtsModel
     target_col::Symbol
     data_schema::Dict{Symbol, Type}
     m::Int

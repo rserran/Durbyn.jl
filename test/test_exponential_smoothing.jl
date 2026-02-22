@@ -90,7 +90,7 @@ using Durbyn.TableOps
             @test fit_lambda.lambda == 0.5
 
             # Auto lambda selection
-            fit_auto_lambda = ets(ap, 12, "AAN"; lambda="auto")
+            fit_auto_lambda = ets(ap, 12, "AAN"; lambda=:auto)
             fc_auto_lambda = forecast(fit_auto_lambda, h = 15)
             # plot(fc_auto_lambda)  # Requires Plots.jl
             @test fit_auto_lambda isa ETS
@@ -99,13 +99,13 @@ using Durbyn.TableOps
         end
 
         @testset "Information criteria selection" begin
-            fit_aic = ets(ap, 12, "ZZZ"; ic="aic")
+            fit_aic = ets(ap, 12, "ZZZ"; ic=:aic)
             @test fit_aic.aic isa Float64
 
-            fit_bic = ets(ap, 12, "ZZZ"; ic="bic")
+            fit_bic = ets(ap, 12, "ZZZ"; ic=:bic)
             @test fit_bic.bic isa Float64
 
-            fit_aicc = ets(ap, 12, "ZZZ"; ic="aicc")
+            fit_aicc = ets(ap, 12, "ZZZ"; ic=:aicc)
             @test fit_aicc.aicc isa Float64
         end
 
@@ -154,7 +154,7 @@ using Durbyn.TableOps
         end
 
         @testset "Simple initialization" begin
-            fit_simple = es_ses(ap, 12; initial="simple")
+            fit_simple = es_ses(ap, 12; initial=:simple)
             fc_simple = forecast(fit_simple, h = 4)
             @test fc_simple.mean ≈ [459.8755335582515, 459.8755335582515, 459.8755335582515, 459.8755335582515]
             @test fit_simple isa SES
@@ -222,8 +222,8 @@ using Durbyn.TableOps
         end
 
         @testset "Simple initialization" begin
-            fit_simple1 = es_holt(ap, 12; initial="simple")
-            fit_simple2 = es_holt(ap; initial="simple")
+            fit_simple1 = es_holt(ap, 12; initial=:simple)
+            fit_simple2 = es_holt(ap; initial=:simple)
             fc1 = forecast(fit_simple1, h = 12)
             fc2 = forecast(fit_simple2, h = 12)
             # plot(fc1)  # Requires Plots.jl
@@ -256,7 +256,7 @@ using Durbyn.TableOps
 
     @testset "holt_winters() - Holt-Winters Seasonal Method" begin
         @testset "Additive seasonality" begin
-            fit = es_holt_winters(ap, 12; seasonal="additive")
+            fit = es_holt_winters(ap, 12; seasonal=:additive)
             fc = forecast(fit, h = 65)
             # plot(fc)  # Requires Plots.jl
             @test length(fc.mean) == 65
@@ -266,7 +266,7 @@ using Durbyn.TableOps
         end
 
         @testset "Multiplicative seasonality" begin
-            fit = es_holt_winters(ap, 12; seasonal="multiplicative")
+            fit = es_holt_winters(ap, 12; seasonal=:multiplicative)
             fc = forecast(fit, h = 34)
             # plot(fc)  # Requires Plots.jl
             @test length(fc.mean) == 34
@@ -284,7 +284,7 @@ using Durbyn.TableOps
         end
 
         @testset "Exponential trend with multiplicative season" begin
-            fit = es_holt_winters(ap, 12; seasonal="multiplicative", exponential=false)
+            fit = es_holt_winters(ap, 12; seasonal=:multiplicative, exponential=false)
             fc = forecast(fit, h = 12)
             # plot(fc)  # Requires Plots.jl
             @test fit isa HoltWinters
@@ -292,11 +292,11 @@ using Durbyn.TableOps
 
         @testset "Invalid combinations" begin
             # Additive seasonality with exponential trend is forbidden
-            @test_throws ArgumentError es_holt_winters(ap, 12; seasonal="additive", exponential=true)
+            @test_throws ArgumentError es_holt_winters(ap, 12; seasonal=:additive, exponential=true)
         end
 
         @testset "Simple initialization" begin
-            fit_simple = es_holt_winters(ap, 12; initial="simple")
+            fit_simple = es_holt_winters(ap, 12; initial=:simple)
             fc = forecast(fit_simple, h = 12)
             # plot(fc)  # Requires Plots.jl
             @test fit_simple isa HoltWinters
@@ -452,7 +452,7 @@ using Durbyn.TableOps
 
         spec_auto = EtsSpec(@formula(value = e("Z") + t("Z") + s("Z") + drift(:auto)))
         @test spec_auto.damped === nothing
-        fit_auto = fit(spec_auto, data_basic; m = 12, ic = "aicc")
+        fit_auto = fit(spec_auto, data_basic; m = 12, ic = :aicc)
         fc_auto = forecast(fit_auto, h = 4)
         @test fc_auto isa Forecast
 
@@ -490,7 +490,7 @@ using Durbyn.TableOps
         fc_holt_spec = forecast(fit_holt_spec, h = 6)
         @test length(fc_holt_spec.mean) == 6
 
-        hw_spec = HoltWintersSpec(@formula(value = hw(seasonal="additive")))
+        hw_spec = HoltWintersSpec(@formula(value = hw(seasonal=:additive)))
         fit_hw_spec = fit(hw_spec, data_basic; m = 12)
         @test fit_hw_spec isa FittedHoltWinters
         fc_hw_spec = forecast(fit_hw_spec, h = 3)

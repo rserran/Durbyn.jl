@@ -68,7 +68,7 @@ result = brent(f, -10.0, 10.0; options=BrentOptions(tol=1e-10, trace=true))
 """
 function brent(f::Function, lower::Float64, upper::Float64; options::BrentOptions=BrentOptions())
     if lower >= upper
-        error("'xmin' not less than 'xmax'")
+        throw(ArgumentError("'xmin' not less than 'xmax'"))
     end
 
     tol = options.tol

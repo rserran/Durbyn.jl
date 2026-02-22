@@ -110,14 +110,14 @@ res = mstl(y; m=[7,30], iterate=2, s_window=[11,23], robust=true)
 function mstl(
     x::AbstractVector,
     m::Union{Integer,AbstractVector{<:Integer}};
-    lambda::Union{Nothing,Real, String} = nothing,
+    lambda::Union{Nothing,Real, Symbol} = nothing,
     iterate::Integer = 2,
     s_window = nothing,
     stl_kwargs...,
 )
 
     n = length(x)
-    @assert n > 0 "x must be non-empty"
+    n > 0 || throw(ArgumentError("x must be non-empty"))
 
     orig = Vector{Float64}([ismissing(v) ? NaN : Float64(v) for v in x])
     xu   = copy(orig)
@@ -151,7 +151,7 @@ function mstl(
         fill(Int(s_window), length(pers))
     else
         v = collect(Int.(s_window))
-        @assert !isempty(v) "s_window cannot be empty."
+        !isempty(v) || throw(ArgumentError("s_window cannot be empty."))
         [v[mod1(i, length(v))] for i in 1:length(pers)]
     end
 

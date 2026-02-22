@@ -172,11 +172,11 @@ import Durbyn.Grammar: EtsComponentTerm, EtsDriftTerm
             term = hw()
             @test term isa HoltWintersTerm
 
-            term_add = hw(seasonal="additive")
-            @test term_add.seasonal == "additive"
+            term_add = hw(seasonal=:additive)
+            @test term_add.seasonal === :additive
 
-            term_mult = holt_winters(seasonal="multiplicative")
-            @test term_mult.seasonal == "multiplicative"
+            term_mult = holt_winters(seasonal=:multiplicative)
+            @test term_mult.seasonal === :multiplicative
 
             term_damped = hw(damped=true)
             @test term_damped.damped == true
@@ -185,13 +185,13 @@ import Durbyn.Grammar: EtsComponentTerm, EtsDriftTerm
         @testset "croston() - Intermittent demand" begin
             term = croston()
             @test term isa CrostonTerm
-            @test term.method == "hyndman"
+            @test term.method === :hyndman
 
-            term_sba = croston(method="sba")
-            @test term_sba.method == "sba"
+            term_sba = croston(method=:sba)
+            @test term_sba.method === :sba
 
-            term_classic = croston(method="classic")
-            @test term_classic.method == "classic"
+            term_classic = croston(method=:classic)
+            @test term_classic.method === :classic
         end
 
         @testset "arar() - ARAR model" begin

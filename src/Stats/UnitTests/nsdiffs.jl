@@ -1,6 +1,5 @@
 """
     nsdiffs(x, m; alpha=0.05, test::Symbol=:seas, maxD::Int=1, kwargs...) -> Int
-    nsdiffs(x, m; alpha=0.05, test::String=:seas, maxD::Int=1, kwargs...) -> Int
 # Number of seasonal differences
 Estimate the number of seasonal differences required to make a time series seasonally stationary.
 
@@ -83,17 +82,6 @@ function nsdiffs(x::AbstractVector,
     return compute_D(x, m, Val(test), α, maxD; kwargs...)
 end
 
-function nsdiffs(;x::AbstractVector,
-    m::Int,
-    alpha::Real=0.05,
-    test::String="seas",
-    maxD::Int=1,
-    kwargs...)
-
-    test = match_arg(test, ["ocsb", "seas"])
-    test = Symbol(test)
-    return nsdiffs(x, m, alpha=alpha, test=test, maxD = maxD, kwargs...)
-end
 
 function normalize_alpha(alpha::Real, test::Symbol)
     notes = String[]

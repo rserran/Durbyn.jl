@@ -115,7 +115,7 @@ end
 Represents Holt-Winters seasonal exponential smoothing options (`hw()`/`holt_winters()`).
 """
 struct HoltWintersTerm <: AbstractTerm
-    seasonal::String
+    seasonal::Symbol
     damped::Union{Bool, Nothing}
     exponential::Bool
 end
@@ -126,22 +126,22 @@ end
 Represents Croston's intermittent-demand model options within a formula.
 
 # Fields
-- `method::String` - Croston method variant:
-  - `"hyndman"` - Simple Croston from ExponentialSmoothing module (default)
-  - `"classic"` - Classical Croston from IntermittentDemand module
-  - `"sba"` - Syntetos-Boylan Approximation (bias-corrected)
-  - `"sbj"` - Shale-Boylan-Johnston Bias Correction
-- `init_strategy::Union{String, Nothing}` - Initialization: "mean" or "naive" (IntermittentDemand only)
+- `method::Symbol` - Croston method variant:
+  - `:hyndman` - Simple Croston from ExponentialSmoothing module (default)
+  - `:classic` - Classical Croston from IntermittentDemand module
+  - `:sba` - Syntetos-Boylan Approximation (bias-corrected)
+  - `:sbj` - Shale-Boylan-Johnston Bias Correction
+- `init_strategy::Union{Symbol, Nothing}` - Initialization: :mean or :naive (IntermittentDemand only)
 - `number_of_params::Union{Int, Nothing}` - Number of parameters to optimize: 1 or 2 (IntermittentDemand only)
-- `cost_metric::Union{String, Nothing}` - Optimization metric: "mar", "msr", "mae", "mse" (IntermittentDemand only)
+- `cost_metric::Union{Symbol, Nothing}` - Optimization metric: :mar, :msr, :mae, :mse (IntermittentDemand only)
 - `optimize_init::Union{Bool, Nothing}` - Optimize initial values (IntermittentDemand only)
 - `rm_missing::Union{Bool, Nothing}` - Remove missing values (IntermittentDemand only)
 """
 struct CrostonTerm <: AbstractTerm
-    method::String
-    init_strategy::Union{String, Nothing}
+    method::Symbol
+    init_strategy::Union{Symbol, Nothing}
     number_of_params::Union{Int, Nothing}
-    cost_metric::Union{String, Nothing}
+    cost_metric::Union{Symbol, Nothing}
     optimize_init::Union{Bool, Nothing}
     rm_missing::Union{Bool, Nothing}
 end
@@ -227,7 +227,7 @@ STM, OTM, DSTM, DOTM.
 - `model_type::Union{Symbol, Nothing}` - Model variant: :STM, :OTM, :DSTM, :DOTM, or nothing (auto-select)
 - `alpha::Union{Float64, Nothing}` - Smoothing parameter (0 < α < 1), nothing = optimize
 - `theta::Union{Float64, Nothing}` - Theta parameter (≥ 1), nothing = optimize/fixed based on model
-- `decomposition_type::Union{String, Nothing}` - Seasonal adjustment: "multiplicative", "additive", or nothing (auto)
+- `decomposition_type::Union{Symbol, Nothing}` - Seasonal adjustment: `:multiplicative`, `:additive`, or nothing (auto)
 - `nmse::Union{Int, Nothing}` - Steps for multi-step MSE calculation (1-30)
 
 # Examples
@@ -235,14 +235,14 @@ STM, OTM, DSTM, DOTM.
 @formula(sales = theta())                           # Auto-select best variant
 @formula(sales = theta(model=:OTM))                 # Optimized Theta Model
 @formula(sales = theta(model=:STM, alpha=0.3))      # Simple Theta with fixed alpha
-@formula(sales = theta(decomposition="additive"))   # Force additive decomposition
+@formula(sales = theta(decomposition=:additive))    # Force additive decomposition
 ```
 """
 struct ThetaTerm <: AbstractTerm
     model_type::Union{Symbol, Nothing}
     alpha::Union{Float64, Nothing}
     theta::Union{Float64, Nothing}
-    decomposition_type::Union{String, Nothing}
+    decomposition_type::Union{Symbol, Nothing}
     nmse::Union{Int, Nothing}
 end
 
@@ -679,45 +679,47 @@ _normalize_hw_seasonal(x::Symbol) = _normalize_hw_seasonal(string(x))
 function _normalize_hw_seasonal(x::AbstractString)
     val = lowercase(x)
     val in ("additive", "multiplicative") ||
-        throw(ArgumentError("seasonal must be \"additive\" or \"multiplicative\", got $(x)"))
-    return val
+        throw(ArgumentError("seasonal must be :additive or :multiplicative, got $(x)"))
+    return Symbol(val)
 end
 
 """
-    hw(; seasonal="additive", damped=nothing, exponential=false)
-    holt_winters(; seasonal="additive", damped=nothing, exponential=false)
+    hw(; seasonal=:additive, damped=nothing, exponential=false)
+    holt_winters(; seasonal=:additive, damped=nothing, exponential=false)
 
 Specify Holt-Winters seasonal exponential smoothing within a formula.
 """
-function hw(; seasonal::Union{AbstractString,Symbol}="additive",
+function hw(; seasonal::Union{AbstractString,Symbol}=:additive,
              damped=nothing,
              exponential::Bool=false)
     _validate_bool_or_auto(:damped, damped)
-    seasonal_norm = _normalize_hw_seasonal(seasonal)
-    if exponential && seasonal_norm == "additive"
+    seasonal = seasonal isa AbstractString ? Symbol(lowercase(seasonal)) : seasonal
+    seasonal in (:additive, :multiplicative) ||
+        throw(ArgumentError("seasonal must be :additive or :multiplicative, got :$(seasonal)"))
+    if exponential && seasonal === :additive
         throw(ArgumentError("exponential trend is only supported with multiplicative seasonality in Holt-Winters."))
     end
-    return HoltWintersTerm(seasonal_norm, damped, exponential)
+    return HoltWintersTerm(seasonal, damped, exponential)
 end
 holt_winters(; kwargs...) = hw(; kwargs...)
 
 """
-    croston(; method="hyndman", init_strategy=nothing, number_of_params=nothing,
+    croston(; method=:hyndman, init_strategy=nothing, number_of_params=nothing,
             cost_metric=nothing, optimize_init=nothing, rm_missing=nothing)
 
 Specify Croston's intermittent demand model in a formula.
 
 # Arguments
-- `method::String` - Croston method variant (default: "hyndman"):
-  - `"hyndman"` - Simple Croston from ExponentialSmoothing module
-  - `"classic"` - Classical Croston from IntermittentDemand module
-  - `"sba"` - Syntetos-Boylan Approximation (bias-corrected, recommended)
-  - `"sbj"` - Shale-Boylan-Johnston Bias Correction
+- `method::Symbol` - Croston method variant (default: :hyndman):
+  - `:hyndman` - Simple Croston from ExponentialSmoothing module
+  - `:classic` - Classical Croston from IntermittentDemand module
+  - `:sba` - Syntetos-Boylan Approximation (bias-corrected, recommended)
+  - `:sbj` - Shale-Boylan-Johnston Bias Correction
 
-**IntermittentDemand-specific parameters** (only apply to "classic", "sba", "sbj"):
-- `init_strategy::Union{String, Nothing}` - Initialization: "mean" or "naive" (default: "mean")
+**IntermittentDemand-specific parameters** (only apply to :classic, :sba, :sbj):
+- `init_strategy::Union{Symbol, Nothing}` - Initialization: :mean or :naive (default: :mean)
 - `number_of_params::Union{Int, Nothing}` - Parameters to optimize: 1 or 2 (default: 2)
-- `cost_metric::Union{String, Nothing}` - Optimization metric: "mar", "msr", "mae", "mse" (default: "mar")
+- `cost_metric::Union{Symbol, Nothing}` - Optimization metric: :mar, :msr, :mae, :mse (default: :mar)
 - `optimize_init::Union{Bool, Nothing}` - Optimize initial values (default: true)
 - `rm_missing::Union{Bool, Nothing}` - Remove missing values (default: false)
 
@@ -725,16 +727,16 @@ Specify Croston's intermittent demand model in a formula.
 ```julia
 # Simple Croston (ExponentialSmoothing)
 @formula(demand = croston())
-@formula(demand = croston(method="hyndman"))
+@formula(demand = croston(method=:hyndman))
 
 # IntermittentDemand methods
-@formula(demand = croston(method="classic"))
-@formula(demand = croston(method="sba"))      # Recommended for intermittent demand
-@formula(demand = croston(method="sbj"))
+@formula(demand = croston(method=:classic))
+@formula(demand = croston(method=:sba))      # Recommended for intermittent demand
+@formula(demand = croston(method=:sbj))
 
 # With IntermittentDemand parameters
-@formula(demand = croston(method="sba", cost_metric="mse"))
-@formula(demand = croston(method="classic", init_strategy="naive", number_of_params=1))
+@formula(demand = croston(method=:sba, cost_metric=:mse))
+@formula(demand = croston(method=:classic, init_strategy=:naive, number_of_params=1))
 ```
 
 # See Also
@@ -742,7 +744,7 @@ Specify Croston's intermittent demand model in a formula.
 - ExponentialSmoothing.croston - Simple Croston implementation
 - IntermittentDemand.croston_classic, croston_sba, croston_sbj - Advanced implementations
 """
-function croston(; method::Union{AbstractString, Symbol} = "hyndman",
+function croston(; method::Union{AbstractString, Symbol} = :hyndman,
                    init_strategy::Union{AbstractString, Symbol, Nothing} = nothing,
                    number_of_params::Union{Int, Nothing} = nothing,
                    cost_metric::Union{AbstractString, Symbol, Nothing} = nothing,
@@ -756,23 +758,23 @@ function croston(; method::Union{AbstractString, Symbol} = "hyndman",
         throw(ArgumentError("rm_missing must be Bool or nothing, got $(typeof(rm_missing))"))
     end
 
-    method_str = lowercase(String(method))
+    method_sym = method isa AbstractString ? Symbol(lowercase(method)) : method
 
-    valid_methods = ("hyndman", "classic", "sba", "sbj")
-    if !(method_str in valid_methods)
+    valid_methods = (:hyndman, :classic, :sba, :sbj)
+    if !(method_sym in valid_methods)
         throw(ArgumentError(
-            "method must be one of $(valid_methods), got \"$(method_str)\""
+            "method must be one of $(valid_methods), got :$(method_sym)"
         ))
     end
 
+    init_sym = nothing
     if !isnothing(init_strategy)
-        init_str = lowercase(String(init_strategy))
-        if !(init_str in ("mean", "naive"))
+        init_sym = init_strategy isa AbstractString ? Symbol(lowercase(init_strategy)) : init_strategy
+        if !(init_sym in (:mean, :naive))
             throw(ArgumentError(
-                "init_strategy must be \"mean\" or \"naive\", got \"$(init_str)\""
+                "init_strategy must be :mean or :naive, got :$(init_sym)"
             ))
         end
-        init_strategy = init_str
     end
 
     if !isnothing(number_of_params)
@@ -783,24 +785,24 @@ function croston(; method::Union{AbstractString, Symbol} = "hyndman",
         end
     end
 
+    cost_sym = nothing
     if !isnothing(cost_metric)
-        cost_str = lowercase(String(cost_metric))
-        if !(cost_str in ("mar", "msr", "mae", "mse"))
+        cost_sym = cost_metric isa AbstractString ? Symbol(lowercase(cost_metric)) : cost_metric
+        if !(cost_sym in (:mar, :msr, :mae, :mse))
             throw(ArgumentError(
-                "cost_metric must be one of (\"mar\", \"msr\", \"mae\", \"mse\"), got \"$(cost_str)\""
+                "cost_metric must be one of (:mar, :msr, :mae, :mse), got :$(cost_sym)"
             ))
         end
-        cost_metric = cost_str
     end
 
-    if method_str == "hyndman" &&
-       (!isnothing(init_strategy) || !isnothing(number_of_params) ||
-        !isnothing(cost_metric) || !isnothing(optimize_init) || !isnothing(rm_missing))
+    if method_sym === :hyndman &&
+       (!isnothing(init_sym) || !isnothing(number_of_params) ||
+        !isnothing(cost_sym) || !isnothing(optimize_init) || !isnothing(rm_missing))
         @warn "IntermittentDemand-specific parameters (init_strategy, number_of_params, cost_metric, optimize_init, rm_missing) " *
-              "are ignored for method=\"hyndman\". These parameters only apply to \"classic\", \"sba\", and \"sbj\" methods."
+              "are ignored for method=:hyndman. These parameters only apply to :classic, :sba, and :sbj methods."
     end
 
-    return CrostonTerm(method_str, init_strategy, number_of_params, cost_metric, optimize_init, rm_missing)
+    return CrostonTerm(method_sym, init_sym, number_of_params, cost_sym, optimize_init, rm_missing)
 end
 
 """
@@ -1020,9 +1022,9 @@ and short-term dynamics, then combines their forecasts.
   `nothing` = optimize automatically
 - `theta_param::Union{Real, Nothing}=nothing` - Theta parameter (≥ 1).
   Ignored for STM/DSTM (fixed at 2). `nothing` = optimize for OTM/DOTM
-- `decomposition::Union{String, Nothing}=nothing` - Seasonal decomposition:
-  - `"multiplicative"` - Multiply seasonal factors (default for positive data)
-  - `"additive"` - Add seasonal factors
+- `decomposition::Union{Symbol, Nothing}=nothing` - Seasonal decomposition:
+  - `:multiplicative` - Multiply seasonal factors (default for positive data)
+  - `:additive` - Add seasonal factors
   - `nothing` - Auto-detect based on data characteristics
 - `nmse::Union{Int, Nothing}=nothing` - Steps for multi-step MSE (1-30, default: 3)
 
@@ -1042,10 +1044,10 @@ and short-term dynamics, then combines their forecasts.
 @formula(sales = theta(model=:OTM, alpha=0.2))
 
 # Force seasonal decomposition type
-@formula(sales = theta(decomposition="additive"))
+@formula(sales = theta(decomposition=:additive))
 
 # Full specification
-@formula(sales = theta(model=:DOTM, decomposition="multiplicative", nmse=5))
+@formula(sales = theta(model=:DOTM, decomposition=:multiplicative, nmse=5))
 ```
 
 # See Also
@@ -1054,7 +1056,7 @@ and short-term dynamics, then combines their forecasts.
 function theta(; model::Union{Symbol, Nothing}=nothing,
                 alpha::Union{Real, Nothing}=nothing,
                 theta_param::Union{Real, Nothing}=nothing,
-                decomposition::Union{AbstractString, Symbol, Nothing}=nothing,
+                decomposition::Union{Symbol, Nothing}=nothing,
                 nmse::Union{Int, Nothing}=nothing)
 
     
@@ -1084,11 +1086,11 @@ function theta(; model::Union{Symbol, Nothing}=nothing,
         end
     end
 
-    decomp_str = nothing
+    decomp_sym = nothing
     if !isnothing(decomposition)
-        decomp_str = lowercase(String(decomposition))
-        decomp_str ∈ ("multiplicative", "additive") || throw(ArgumentError(
-            "decomposition must be \"multiplicative\" or \"additive\", got \"$(decomposition)\""))
+        decomp_sym = decomposition
+        decomp_sym ∈ (:multiplicative, :additive) || throw(ArgumentError(
+            "decomposition must be :multiplicative or :additive, got :$(decomposition)"))
     end
 
     if !isnothing(nmse)
@@ -1096,7 +1098,7 @@ function theta(; model::Union{Symbol, Nothing}=nothing,
             "nmse must be between 1 and 30, got $(nmse)"))
     end
 
-    return ThetaTerm(model, alpha_f, theta_f, decomp_str, nmse)
+    return ThetaTerm(model, alpha_f, theta_f, decomp_sym, nmse)
 end
 
 const _DIFFUSION_VALID_MODELS = (:Bass, :Gompertz, :GSGompertz, :Weibull)
@@ -1628,7 +1630,7 @@ function Base.show(io::IO, term::HoltTerm)
 end
 
 function Base.show(io::IO, term::HoltWintersTerm)
-    args = ["seasonal=\"$(term.seasonal)\""]
+    args = ["seasonal=:$(term.seasonal)"]
     if !isnothing(term.damped)
         push!(args, "damped=$(term.damped)")
     end
@@ -1640,17 +1642,17 @@ end
 
 function Base.show(io::IO, term::CrostonTerm)
     args = String[]
-    if term.method != "hyndman"
-        push!(args, "method=\"$(term.method)\"")
+    if term.method !== :hyndman
+        push!(args, "method=:$(term.method)")
     end
     if !isnothing(term.init_strategy)
-        push!(args, "init_strategy=\"$(term.init_strategy)\"")
+        push!(args, "init_strategy=:$(term.init_strategy)")
     end
     if !isnothing(term.number_of_params)
         push!(args, "number_of_params=$(term.number_of_params)")
     end
     if !isnothing(term.cost_metric)
-        push!(args, "cost_metric=\"$(term.cost_metric)\"")
+        push!(args, "cost_metric=:$(term.cost_metric)")
     end
     if !isnothing(term.optimize_init)
         push!(args, "optimize_init=$(term.optimize_init)")
@@ -1755,7 +1757,7 @@ function Base.show(io::IO, term::ThetaTerm)
         push!(args, "theta_param=$(term.theta)")
     end
     if !isnothing(term.decomposition_type)
-        push!(args, "decomposition=\"$(term.decomposition_type)\"")
+        push!(args, "decomposition=:$(term.decomposition_type)")
     end
     if !isnothing(term.nmse)
         push!(args, "nmse=$(term.nmse)")

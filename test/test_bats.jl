@@ -14,7 +14,7 @@ import Durbyn.Generics: Forecast, forecast, fitted
     @test length(fit.errors) == length(ap)
     @test all(isfinite, fit.fitted_values)
     @test all(isfinite, fit.errors)
-    @test isfinite(fit.AIC)
+    @test !isnothing(fit.aic)
 
     fitted_view = fitted(fit)
     @test fitted_view === fit.fitted_values
@@ -45,7 +45,7 @@ end
     @test isnothing(fit.ma_coefficients)
     @test fit.seasonal_periods == [12]
     @test all(isfinite, fit.fitted_values)
-    @test isfinite(fit.AIC)
+    @test !isnothing(fit.aic)
 
     fc = forecast(fit; h=12)
     @test length(fc.mean) == 12
@@ -59,7 +59,7 @@ end
     @test !isnothing(fit.lambda)
     @test isfinite(fit.lambda)
     @test all(isfinite, fit.fitted_values)
-    @test isfinite(fit.AIC)
+    @test !isnothing(fit.aic)
 
     fc = forecast(fit; h=12)
     @test length(fc.mean) == 12
@@ -72,7 +72,7 @@ end
     @test fit isa BATSModel
     @test isnothing(fit.lambda)
     @test all(isfinite, fit.fitted_values)
-    @test isfinite(fit.AIC)
+    @test !isnothing(fit.aic)
 
     fc = forecast(fit; h=12)
     @test length(fc.mean) == 12
@@ -165,7 +165,7 @@ end
 
     @test fit.alpha ≈ 1.204409639474027 rtol=1e-6
     @test fit.gamma_values[1] ≈ -0.020768738557064 rtol=1e-4
-    @test fit.AIC ≈ 1555.678560109123509 rtol=1e-6
+    @test fit.aic ≈ 1555.678560109123509 rtol=1e-6
     @test fit.variance ≈ 277.321283192424005 rtol=1e-6
     @test isnothing(fit.beta)
     @test isnothing(fit.damping_parameter)
@@ -190,7 +190,7 @@ end
     @test fit.beta ≈ -0.126848346969942 rtol=1e-4
     @test fit.damping_parameter ≈ 0.800000073472066 rtol=1e-4
     @test fit.gamma_values[1] ≈ -0.027656243695200 rtol=1e-4
-    @test fit.AIC ≈ 1560.057516483699828 rtol=1e-6
+    @test fit.aic ≈ 1560.057516483699828 rtol=1e-6
     @test fit.variance ≈ 274.216915002459075 rtol=1e-6
 
     expected_fc = [445.698590387200227, 436.793284276621648, 470.135368260069697,
@@ -214,7 +214,7 @@ end
     @test fit.alpha ≈ 0.843284820906740 rtol=0.01
     @test fit.beta ≈ 0.033641672890850 rtol=0.01
     @test fit.damping_parameter ≈ 0.994477807394488 rtol=0.001
-    @test fit.AIC ≈ 1402.161640106883851 rtol=0.001
+    @test fit.aic ≈ 1402.161640106883851 rtol=0.001
 
     expected_fc = [444.648315793595771, 437.035121749424206, 505.556675564460079,
                    492.738245325743833, 493.725132247300508, 558.995470149387074,

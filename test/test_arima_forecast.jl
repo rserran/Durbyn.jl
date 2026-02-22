@@ -81,7 +81,7 @@ end
 @testset "arima() - CSS-ML method (default)" begin
     Random.seed!(50)
     y = randn(80)
-    fit = arima(y, 1; order=PDQ(1,0,0), method="CSS-ML")
+    fit = arima(y, 1; order=PDQ(1,0,0), method=:css_ml)
     @test occursin("ARIMA", fit.method)
     @test isfinite(fit.aic)
 end
@@ -89,7 +89,7 @@ end
 @testset "arima() - ML method" begin
     Random.seed!(51)
     y = randn(80)
-    fit = arima(y, 1; order=PDQ(1,0,0), method="ML")
+    fit = arima(y, 1; order=PDQ(1,0,0), method=:ml)
     @test occursin("ARIMA", fit.method)
     @test isfinite(fit.aic)
 end
@@ -97,7 +97,7 @@ end
 @testset "arima() - CSS method" begin
     Random.seed!(52)
     y = randn(80)
-    fit = arima(y, 1; order=PDQ(1,0,0), method="CSS")
+    fit = arima(y, 1; order=PDQ(1,0,0), method=:css)
     @test occursin("ARIMA", fit.method)
     @test fit.aic === nothing
 end

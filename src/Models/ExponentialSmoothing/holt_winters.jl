@@ -16,20 +16,20 @@ multiplicative seasonality, and can optionally include damping (φ) and exponent
 - `components::Vector{Any}`: Model components (level, trend, and seasonal).
 - `x::AbstractArray`: The original time series data.
 - `par::Any`: Dictionary containing model parameters (alpha, beta, gamma, phi if damped).
-- `loglik::Union{Float64,Int}`: Log-likelihood of the model.
+- `loglik::Float64`: Log-likelihood of the model.
 - `initstate::AbstractArray`: Initial state estimates (initial level, trend, and seasonal indices).
 - `states::AbstractArray`: Level, trend, and seasonal estimates over time.
 - `state_names::Any`: Names of the state variables.
-- `SSE::Union{Float64,Int}`: Sum of squared errors, a measure of model fit.
-- `sigma2::Union{Float64,Int}`: Residual variance (σ²).
+- `sse::Float64`: Sum of squared errors, a measure of model fit.
+- `sigma2::Float64`: Residual variance (σ²).
 - `m::Int`: Seasonal period (e.g., 12 for monthly data, 4 for quarterly).
 - `lambda::Union{Float64,Bool,Nothing}`: Box-Cox transformation parameter (nothing if not used).
 - `biasadj::Bool`: Boolean flag indicating whether bias adjustment was applied.
-- `aic::Union{Float64,Int}`: Akaike Information Criterion for model selection.
-- `bic::Union{Float64,Int}`: Bayesian Information Criterion for model selection.
-- `aicc::Union{Float64,Int}`: Corrected AIC for small sample sizes.
-- `mse::Union{Float64,Int}`: Mean Squared Error of the model fit.
-- `amse::Union{Float64,Int}`: Average Mean Squared Error.
+- `aic::Float64`: Akaike Information Criterion for model selection.
+- `bic::Float64`: Bayesian Information Criterion for model selection.
+- `aicc::Float64`: Corrected AIC for small sample sizes.
+- `mse::Float64`: Mean Squared Error of the model fit.
+- `amse::Float64`: Average Mean Squared Error.
 - `fit::Any`: The fitted model object.
 - `method::String`: The method used for model fitting (e.g., "Holt-Winters' additive method").
 
@@ -40,29 +40,29 @@ multiplicative seasonality, and can optionally include damping (φ) and exponent
 struct HoltWinters
     fitted::AbstractArray
     residuals::AbstractArray
-    components::Vector{Any}
+    components::Vector{String}
     x::AbstractArray
-    par::Any
-    loglik::Union{Float64,Int}
+    par::Dict{String,Any}
+    loglik::Float64
     initstate::AbstractArray
     states::AbstractArray
-    state_names::Any
-    SSE::Union{Float64,Int}
-    sigma2::Union{Float64,Int}
+    state_names::Vector{String}
+    sse::Float64
+    sigma2::Float64
     m::Int
     lambda::Union{Float64,Bool,Nothing}
     biasadj::Bool
-    aic::Union{Float64,Int}
-    bic::Union{Float64,Int}
-    aicc::Union{Float64,Int}
-    mse::Union{Float64,Int}
-    amse::Union{Float64,Int}
-    fit::Any
+    aic::Float64
+    bic::Float64
+    aicc::Float64
+    mse::Float64
+    amse::Float64
+    fit::Union{Dict{String,Any}, Nothing}
     method::String
 end
 
 """
-    holt_winters(y, m; seasonal="additive", damped=false, initial="optimal",
+    holt_winters(y, m; seasonal=:additive, damped=false, initial=:optimal,
                  exponential=false, alpha=nothing, beta=nothing, gamma=nothing,
                  phi=nothing, lambda=nothing, biasadj=false,
                  options=NelderMeadOptions())
@@ -78,15 +78,15 @@ for the level, one for the trend, and one for the seasonal component.
 - `m::Int`: Seasonal period (e.g., 12 for monthly data, 4 for quarterly, 7 for daily with weekly seasonality).
 
 # Keyword Arguments
-- `seasonal::String="additive"`: Type of seasonal component:
-  - `"additive"`: Seasonal variations are constant across levels (default).
-  - `"multiplicative"`: Seasonal variations change proportionally with level.
+- `seasonal::Symbol=:additive`: Type of seasonal component:
+  - `:additive`: Seasonal variations are constant across levels (default).
+  - `:multiplicative`: Seasonal variations change proportionally with level.
 - `damped::Bool=false`: If `true`, applies damping to the trend component using parameter φ.
   Damped trends prevent forecasts from trending indefinitely into the future.
-- `initial::String="optimal"`: Initialization method:
-  - `"optimal"`: Uses state-space optimization via ETS framework (default).
-  - `"simple"`: Uses conventional Holt-Winters initialization.
-  Note: Damped trends require `"optimal"` initialization.
+- `initial::Symbol=:optimal`: Initialization method:
+  - `:optimal`: Uses state-space optimization via ETS framework (default).
+  - `:simple`: Uses conventional Holt-Winters initialization.
+  Note: Damped trends require `:optimal` initialization.
 - `exponential::Bool=false`: If `true`, uses exponential (multiplicative) trend instead of additive.
   Cannot be combined with additive seasonality.
 - `alpha::Union{Float64,Nothing}=nothing`: Level smoothing parameter (0 < α < 1).
@@ -99,7 +99,7 @@ for the level, one for the trend, and one for the seasonal component.
   If `nothing`, φ is estimated from the data.
 - `lambda::Union{Float64,Bool,Nothing}=nothing`: Box-Cox transformation parameter.
   - `nothing`: No transformation (default).
-  - `"auto"` or `true`: Automatically select optimal λ.
+  - `:auto` or `true`: Automatically select optimal λ.
   - `Float64`: Use specified λ value.
 - `biasadj::Bool=false`: Apply bias adjustment for Box-Cox back-transformation.
 - `options::NelderMeadOptions`: Optimization options for parameter estimation.
@@ -110,7 +110,7 @@ for the level, one for the trend, and one for the seasonal component.
 
 # Model Formulation
 
-## Additive Seasonality (seasonal="additive")
+## Additive Seasonality (seasonal=:additive)
 ```
 yₜ = ℓₜ₋₁ + bₜ₋₁ + sₜ₋ₘ + εₜ
 ℓₜ = α(yₜ - sₜ₋ₘ) + (1-α)(ℓₜ₋₁ + bₜ₋₁)
@@ -121,7 +121,7 @@ where ℓₜ is the level, bₜ is the trend, sₜ is the seasonal component, an
 
 **h-step ahead forecast:** ŷₜ₊ₕ = ℓₜ + h·bₜ + sₜ₊ₕ₋ₘ
 
-## Multiplicative Seasonality (seasonal="multiplicative")
+## Multiplicative Seasonality (seasonal=:multiplicative)
 ```
 yₜ = (ℓₜ₋₁ + bₜ₋₁)·sₜ₋ₘ + εₜ
 ℓₜ = α(yₜ/sₜ₋ₘ) + (1-α)(ℓₜ₋₁ + bₜ₋₁)
@@ -159,7 +159,7 @@ println(fit_add)
 fc_add = forecast(fit_add, h=12)
 
 # Multiplicative seasonality
-fit_mult = holt_winters(y, 4, seasonal="multiplicative")
+fit_mult = holt_winters(y, 4, seasonal=:multiplicative)
 
 # Damped trend (recommended for long-horizon forecasts)
 fit_damped = holt_winters(y, 4, damped=true)
@@ -169,13 +169,13 @@ fc_damped = forecast(fit_damped, h=24)
 fit_fixed = holt_winters(y, 4, alpha=0.7, beta=0.1, gamma=0.3)
 
 # Exponential trend with multiplicative seasonality
-fit_exp = holt_winters(y, 4, seasonal="multiplicative", exponential=true)
+fit_exp = holt_winters(y, 4, seasonal=:multiplicative, exponential=true)
 
 # With Box-Cox transformation
 fit_bc = holt_winters(y, 4, lambda=0.5, biasadj=true)
 
 # Simple initialization
-fit_simple = holt_winters(y, 4, initial="simple")
+fit_simple = holt_winters(y, 4, initial=:simple)
 
 # Monthly data example
 monthly_data = rand(120)  # 10 years of monthly data
@@ -217,9 +217,9 @@ Use Holt-Winters' seasonal method when:
 function holt_winters(
     y::AbstractArray,
     m::Int;
-    seasonal::String = "additive",
+    seasonal::Symbol = :additive,
     damped::Bool = false,
-    initial::String = "optimal",
+    initial::Symbol = :optimal,
     exponential::Bool = false,
     alpha::Union{Float64,Bool,Nothing} = nothing,
     beta::Union{Float64,Bool,Nothing} = nothing,
@@ -230,10 +230,10 @@ function holt_winters(
     options::NelderMeadOptions = NelderMeadOptions(),
 )
 
-    initial = match_arg(initial, ["optimal", "simple"])
-    seasonal = match_arg(seasonal, ["additive", "multiplicative"])
+    initial = _check_arg(initial, (:optimal, :simple), "initial")
+    seasonal = _check_arg(seasonal, (:additive, :multiplicative), "seasonal")
 
-    if seasonal == "additive" && exponential
+    if seasonal === :additive && exponential
         throw(
             ArgumentError("Additive seasonality cannot be combined with exponential trend"),
         )
@@ -249,11 +249,11 @@ function holt_winters(
         )
     end
 
-    if initial == "optimal" || damped
-        if seasonal == "additive" && exponential
-            error("Forbidden model combination")
+    if initial === :optimal || damped
+        if seasonal === :additive && exponential
+            throw(ArgumentError("Forbidden model combination"))
         end
-        model_type = if seasonal == "additive"
+        model_type = if seasonal === :additive
             "AAA"
         elseif exponential
             "MMM"
@@ -270,7 +270,7 @@ function holt_winters(
             gamma = gamma,
             phi = phi,
             damped = damped,
-            opt_crit = "mse",
+            opt_crit = :mse,
             lambda = lambda,
             biasadj = biasadj,
             options = options,
@@ -293,12 +293,12 @@ function holt_winters(
     end
 
     method = damped ? "Damped Holt-Winters'" : "Holt-Winters'"
-    method *= seasonal == "additive" ? " additive method" : " multiplicative method"
+    method *= seasonal === :additive ? " additive method" : " multiplicative method"
     if exponential
         method *= " with exponential trend"
     end
 
-    if damped && initial == "simple"
+    if damped && initial === :simple
         @warn "Damped Holt-Winters' method requires optimal initialization"
     end
 
@@ -309,7 +309,7 @@ function holt_winters(
     aicc = hasfield(typeof(model), :aicc) ? model.aicc : NaN
     mse = hasfield(typeof(model), :mse) ? model.mse : NaN
     amse = hasfield(typeof(model), :amse) ? model.amse : NaN
-    fit = hasfield(typeof(model), :fit) ? model.fit : Float64[]
+    fit = hasfield(typeof(model), :fit) ? model.fit : nothing
 
     return HoltWinters(
         model.fitted,
@@ -321,7 +321,7 @@ function holt_winters(
         model.initstate,
         model.states,
         model.state_names,
-        model.SSE,
+        model.sse,
         model.sigma2,
         model.m,
         model.lambda,

@@ -33,8 +33,8 @@ Fitted Croston model for intermittent demand forecasting.
 [`croston`](@ref), [`forecast`](@ref), [`fitted`](@ref)
 """
 struct CrostonFit
-    modely::Any
-    modelp::Any
+    modely::Union{SES, Nothing}
+    modelp::Union{SES, Nothing}
     type::CrostonType
     x::AbstractArray
     y::AbstractArray
@@ -57,9 +57,9 @@ Croston forecast results for intermittent demand.
 [`CrostonFit`](@ref), [`forecast`](@ref), [`plot`](@ref)
 """
 struct CrostonForecast
-    mean::Any
+    mean::Vector{Float64}
     model::CrostonFit
-    method::Any
+    method::String
     m::Int
 end
 
@@ -138,8 +138,8 @@ function croston(
         y_f_struct = nothing
         p_f_struct = nothing
     else
-        y_f_struct = ses(y, m, initial = "simple", alpha = alpha, options = options)
-        p_f_struct = ses(tt, m, initial = "simple", alpha = alpha, options = options)
+        y_f_struct = ses(y, m, initial = :simple, alpha = alpha, options = options)
+        p_f_struct = ses(tt, m, initial = :simple, alpha = alpha, options = options)
         type = CrostonType(4)
     end
     out = CrostonFit(y_f_struct, p_f_struct, type, x, y, tt, m)

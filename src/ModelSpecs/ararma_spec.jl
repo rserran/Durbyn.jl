@@ -160,7 +160,7 @@ fc = forecast(fitted, h = 12)
 """
 struct FittedArarma <: AbstractFittedModel
     spec::ArarmaSpec
-    fit::Any
+    fit::ArarmaModel
     target_col::Symbol
     data_schema::Dict{Symbol, Type}
 

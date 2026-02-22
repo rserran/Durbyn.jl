@@ -14,7 +14,7 @@ import Tables
 # Internal modules
 using ..Stats
 using ..Grammar
-import ..Utils: is_constant, match_arg, dropmissing, NamedMatrix, align_columns, ismissingish
+import ..Utils: is_constant, _check_arg, dropmissing, NamedMatrix, align_columns, ismissingish
 import ..Stats: handle_missing
 import ..Utils: is_constant_all, drop_constant_columns, is_rank_deficient, row_sums
 import ..Utils: cbind, add_drift_term, setrow!, get_elements, select_rows, as_vector, as_integer

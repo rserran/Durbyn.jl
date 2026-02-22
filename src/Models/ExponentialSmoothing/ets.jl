@@ -9,14 +9,14 @@
         gamma::Union{Float64,Bool,Nothing} = nothing,
         phi::Union{Float64,Bool,Nothing} = nothing,
         additive_only::Bool = false,
-        lambda::Union{Float64,Bool,Nothing,String} = nothing,
+        lambda::Union{Float64,Bool,Nothing,Symbol} = nothing,
         biasadj::Bool = false,
         lower::AbstractArray = [0.0001, 0.0001, 0.0001, 0.8],
         upper::AbstractArray = [0.9999, 0.9999, 0.9999, 0.98],
-        opt_crit::String = "lik",
+        opt_crit::Symbol = :lik,
         nmse::Int = 3,
-        bounds::String = "both",
-        ic::String = "aicc",
+        bounds::Symbol = :both,
+        ic::Symbol = :aicc,
         restrict::Bool = true,
         allow_multiplicative_trend::Bool = false,
         use_initial_values::Bool = false,
@@ -53,23 +53,23 @@ information criterion given by `ic`.
 - `gamma::Union{Float64,Bool,Nothing}=nothing`: Seasonal smoothing parameter. Same rules as `alpha`.
 - `phi::Union{Float64,Bool,Nothing}=nothing`: Damping parameter (for damped trend). If `nothing`, estimated.
 - `additive_only::Bool=false`: If `true`, restrict search to additive-error/season/trend models.
-- `lambda::Union{Float64,Bool,Nothing,String}=nothing`: Box-Cox transform parameter. Use a numeric
-  value to apply a fixed transform; pass `”auto”` to select via `BoxCox.lambda`-style search;
-  `nothing` = no transform. When set (including `”auto”`), only additive models are considered.
+- `lambda::Union{Float64,Bool,Nothing,Symbol}=nothing`: Box-Cox transform parameter. Use a numeric
+  value to apply a fixed transform; pass `:auto` to select via `BoxCox.lambda`-style search;
+  `nothing` = no transform. When set (including `:auto`), only additive models are considered.
 - `biasadj::Bool=false`: Use bias-adjusted back-transformation to return *mean* (not median) forecasts
   and fits when Box-Cox is used.
 - `lower::AbstractArray=[1e-4, 1e-4, 1e-4, 0.8]`: Lower bounds for `(alpha, beta, gamma, phi)`.
-  Ignored if `bounds==”admissible”`.
+  Ignored if `bounds === :admissible`.
 - `upper::AbstractArray=[0.9999, 0.9999, 0.9999, 0.98]`: Upper bounds for `(alpha, beta, gamma, phi)`.
-  Ignored if `bounds==”admissible”`.
-- `opt_crit::String=”lik”`: Optimization criterion. One of
-  `”lik”` (log-likelihood), `”amse”` (average MSE over first `nmse` horizons),
-  `”mse”`, `”sigma”` (stdev of residuals), or `”mae”`.
-- `nmse::Int=3`: Horizons for `”amse”` (1 ≤ `nmse` ≤ 30).
-- `bounds::String=”both”`: Parameter space restriction:
-  `”usual”` enforces `[lower, upper]`, `”admissible”` enforces ETS admissibility,
-  `”both”` uses their intersection.
-- `ic::String=”aicc”`: Information criterion used for model selection; one of `”aicc”`, `”aic”`, `”bic”`.
+  Ignored if `bounds === :admissible`.
+- `opt_crit::Symbol=:lik`: Optimization criterion. One of
+  `:lik` (log-likelihood), `:amse` (average MSE over first `nmse` horizons),
+  `:mse`, `:sigma` (stdev of residuals), or `:mae`.
+- `nmse::Int=3`: Horizons for `:amse` (1 ≤ `nmse` ≤ 30).
+- `bounds::Symbol=:both`: Parameter space restriction:
+  `:usual` enforces `[lower, upper]`, `:admissible` enforces ETS admissibility,
+  `:both` uses their intersection.
+- `ic::Symbol=:aicc`: Information criterion used for model selection; one of `:aicc`, `:aic`, `:bic`.
 - `restrict::Bool=true`: Disallow models with infinite variance.
 - `allow_multiplicative_trend::Bool=false`: If `true`, multiplicative trends may be considered when
   searching. Ignored if a multiplicative trend is explicitly requested in `model`.
@@ -118,7 +118,7 @@ fc2 = forecast(fit2, h=12)
 plot(fc2)
 
 # Use a damped trend search and automatic Box-Cox selection
-fit3 = ets(ap, 12, "ZZZ"; damped=nothing, lambda="auto", biasadj=true)
+fit3 = ets(ap, 12, "ZZZ"; damped=nothing, lambda=:auto, biasadj=true)
 fc3 = forecast(fit3, h=12)
 plot(fc3)
 ```
@@ -133,14 +133,14 @@ function ets(
     gamma::Union{Float64,Bool,Nothing} = nothing,
     phi::Union{Float64,Bool,Nothing} = nothing,
     additive_only::Bool = false,
-    lambda::Union{Float64,Bool,Nothing,String} = nothing,
+    lambda::Union{Float64,Bool,Nothing,Symbol} = nothing,
     biasadj::Bool = false,
     lower::AbstractArray = [0.0001, 0.0001, 0.0001, 0.8],
     upper::AbstractArray = [0.9999, 0.9999, 0.9999, 0.98],
-    opt_crit::String = "lik",
+    opt_crit::Symbol = :lik,
     nmse::Int = 3,
-    bounds::String = "both",
-    ic::String = "aicc",
+    bounds::Symbol = :both,
+    ic::Symbol = :aicc,
     restrict::Bool = true,
     allow_multiplicative_trend::Bool = false,
     use_initial_values::Bool = false,
@@ -149,7 +149,7 @@ function ets(
 )
 
     if model == "ZZZ" && is_constant(y)
-        return ses(y, alpha = 0.99999, initial = "simple")
+        return ses(y, alpha = 0.99999, initial = :simple)
     end
 
     out = ets_base_model(

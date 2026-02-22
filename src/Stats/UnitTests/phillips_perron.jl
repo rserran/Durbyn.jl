@@ -33,8 +33,7 @@ struct PhillipsPerron
 end
 
 """
-    phillips_perron(x; type=:Z_alha, model=:constant, lags=:short, use_lag=nothing) -> PhillipsPerron
-    phillips_perron(;x, type::String="Z_alpha", model::String= "constant", lags::String="short", use_lag::Union{Nothing,Int}=nothing) -> PhillipsPerron 
+    phillips_perron(x; type=:Z_alpha, model=:constant, lags=:short, use_lag=nothing) -> PhillipsPerron
 
     Phillips and Perron (1988) unit root test. Computes either the `:Z_alpha` or `:Z_tau`
 statistic using a Bartlett window to correct for serial correlation and heteroskedasticity.
@@ -116,15 +115,15 @@ function phillips_perron(
 )
     xv = _skipmissing_to_vec(x)
     n0 = length(xv)
-    n0 >= 2 || error("series too short for PP test")
+    n0 >= 2 || throw(ArgumentError("series too short for PP test"))
 
     y = @view xv[2:end]
     y1 = @view xv[1:end-1]
     n = length(y)
 
-    lags in (:short, :long) || error("lags must be :short or :long")
-    model in (:constant, :trend) || error("model must be :constant or :trend")
-    type in (:Z_alpha, :Z_tau) || error("type must be :Z_alpha or :Z_tau")
+    lags in (:short, :long) || throw(ArgumentError("lags must be :short or :long"))
+    model in (:constant, :trend) || throw(ArgumentError("model must be :constant or :trend"))
+    type in (:Z_alpha, :Z_tau) || throw(ArgumentError("type must be :Z_alpha or :Z_tau"))
 
     lmax = if !isnothing(use_lag)
         L = Int(use_lag)
@@ -254,28 +253,6 @@ function phillips_perron(
     end
 end
 
-function phillips_perron(;
-    x,
-    type::String = "Z_alpha",
-    model::String = "constant",
-    lags::String = "short",
-    use_lag::Union{Nothing,Int} = nothing,
-)
-    type = match_arg(type, ["Z_alpha", "Z_tau"])
-    model = match_arg(model, ["constant", "trend"])
-    lags = match_arg(lags, ["short", "long"])
-    type_sym = Symbol(type)
-    model_sym = Symbol(model)
-    lags_sym = Symbol(lags)
-
-    return phillips_perron(
-        x;
-        type = type_sym,
-        model = model_sym,
-        lags = lags_sym,
-        use_lag = use_lag,
-    )
-end
 
 "Approximate p-value for PP by linear interpolation between critical values (when present)."
 function pvalue(u::PhillipsPerron)

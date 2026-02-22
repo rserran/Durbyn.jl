@@ -43,7 +43,7 @@ function validate_and_scale_level(level)
     if minimum(level) > 0 && maximum(level) < 1
         return level * 100
     elseif minimum(level) < 0 || maximum(level) > 99.99
-        error("Confidence limit out of range")
+        throw(ArgumentError("Confidence limit out of range"))
     end
     return sort(level)
 end
@@ -88,7 +88,7 @@ function compute_forecast_case1(object, h, n)
     last_state = vec(object.states[n+1, :])
     trend_type, season_type, damped, m, sigma2, params = object.components[2],
     object.components[3],
-    Bool(object.components[4]),
+    parse(Bool, object.components[4]),
     object.m,
     object.sigma2,
     object.par
@@ -108,7 +108,7 @@ function compute_forecast_case2(object, h, n)
     last_state = vec(object.states[n+1, :])
     trend_type, season_type, damped, m, sigma2, params = object.components[2],
     object.components[3],
-    Bool(object.components[4]),
+    parse(Bool, object.components[4]),
     object.m,
     object.sigma2,
     object.par
@@ -119,7 +119,7 @@ function compute_forecast_case3(object, h, n)
     last_state = vec(object.states[n+1, :])
     trend_type, season_type, damped, m, sigma2, params = object.components[2],
     object.components[3],
-    Bool(object.components[4]),
+    parse(Bool, object.components[4]),
     object.m,
     object.sigma2,
     object.par
@@ -330,7 +330,7 @@ function bootstrap_ets_forecast(obj, h; npaths, level, bootstrap)
     switch_dict = Dict("N" => 0, "A" => 1, "M" => 2)
     component2 = switch_dict[obj.components[2]]
     component3 = switch_dict[obj.components[3]]
-    phi = obj.components[4] == false ? 1.0 : obj.par["phi"]
+    phi = obj.components[4] == "false" ? 1.0 : obj.par["phi"]
 
     y_f = zeros(h)
     #state = vec(as_matrix(state))
@@ -424,7 +424,7 @@ function forecast_ets_base(
     simulate, bootstrap, fan, npaths, level =
         adjust_for_pi_and_biasadj(PI, biasadj, simulate, bootstrap, fan, npaths, level)
     level = process_level(level, fan)
-    damped = Bool(object.components[4])
+    damped = parse(Bool, object.components[4])
     n = length(object.x)
     simulate, bootstrap = adjust_simulation_flags(simulate, bootstrap)
     f = compute_forecast_data(object, h, simulate, npaths, level, bootstrap, damped, n)
@@ -528,7 +528,7 @@ function simulate_ets(
     elseif length(innov) == nsim
         e = innov
     else
-        error("Length of innov must be equal to nsim")
+        throw(ArgumentError("Length of innov must be equal to nsim"))
     end
 
     if components[1] == "M"
@@ -542,7 +542,7 @@ function simulate_ets(
     alpha = check_component(par, "alpha")
     beta = (trend == 0) ? 0.0 : check_component(par, "beta")
     gamma = (season == 0) ? 0.0 : check_component(par, "gamma")
-    phi = components[4] ? check_component(par, "phi") : 1.0
+    phi = parse(Bool, components[4]) ? check_component(par, "phi") : 1.0
 
     simulate_ets_base(
         initstate,

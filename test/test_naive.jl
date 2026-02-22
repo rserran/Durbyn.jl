@@ -325,7 +325,7 @@ const REFERENCE_SD_AP = 119.9663
     end
 
     @testset "lambda=\"auto\" for meanf" begin
-        fit = meanf(AirPassengers, 12; lambda="auto")
+        fit = meanf(AirPassengers, 12; lambda=:auto)
         @test !isnothing(fit.lambda)
         @test isfinite(fit.lambda)
 
@@ -336,7 +336,7 @@ const REFERENCE_SD_AP = 119.9663
 
     @testset "lambda=\"auto\" with non-positive values (meanf)" begin
         y_with_zeros = Float64[0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0]
-        fit = meanf(y_with_zeros, 1; lambda="auto")
+        fit = meanf(y_with_zeros, 1; lambda=:auto)
         @test !isnothing(fit.lambda)
         @test isfinite(fit.lambda)
     end
@@ -836,9 +836,9 @@ import Durbyn.Naive: naive, snaive, rw, rwf, NaiveFit
     @testset "lambda=\"auto\" path (naive/snaive/rw)" begin
         y = AirPassengers
 
-        fit_n  = naive(y, 12; lambda="auto")
-        fit_s  = snaive(y, 12; lambda="auto")
-        fit_rw = rw(y, 12; lambda="auto")
+        fit_n  = naive(y, 12; lambda=:auto)
+        fit_s  = snaive(y, 12; lambda=:auto)
+        fit_rw = rw(y, 12; lambda=:auto)
 
         for fit in (fit_n, fit_s, fit_rw)
             @test !isnothing(fit.lambda)
@@ -851,7 +851,7 @@ import Durbyn.Naive: naive, snaive, rw, rwf, NaiveFit
 
     @testset "lambda=\"auto\" with non-positive values" begin
         y = Float64[-1.0, 0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 11.0]
-        fit = naive(y; lambda="auto")
+        fit = naive(y; lambda=:auto)
         @test !isnothing(fit.lambda)
         @test isfinite(fit.lambda)
     end

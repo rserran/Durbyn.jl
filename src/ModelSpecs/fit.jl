@@ -387,9 +387,9 @@ function fit(spec::HoltWintersSpec, data;
 
     fit_options = merge(spec.options, Dict{Symbol, Any}(kwargs))
     seasonal = haskey(fit_options, :seasonal) ? pop!(fit_options, :seasonal) : spec.seasonal
-    seasonal_str = lowercase(String(seasonal))
-    seasonal_str in ("additive", "multiplicative") ||
-        throw(ArgumentError("seasonal must be \"additive\" or \"multiplicative\", got $(seasonal)"))
+    seasonal_sym = seasonal isa AbstractString ? Symbol(lowercase(seasonal)) : seasonal
+    seasonal_sym in (:additive, :multiplicative) ||
+        throw(ArgumentError("seasonal must be :additive or :multiplicative, got :$(seasonal_sym)"))
 
     damped = haskey(fit_options, :damped) ? pop!(fit_options, :damped) : spec.damped
     if !(damped === nothing || damped isa Bool)
@@ -398,7 +398,7 @@ function fit(spec::HoltWintersSpec, data;
     exponential = haskey(fit_options, :exponential) ? pop!(fit_options, :exponential) : spec.exponential
     exponential isa Bool ||
         throw(ArgumentError("exponential must be Bool, got $(typeof(exponential))"))
-    if exponential && seasonal_str == "additive"
+    if exponential && seasonal_sym === :additive
         throw(ArgumentError("exponential trend cannot be combined with additive seasonality."))
     end
 
@@ -406,7 +406,7 @@ function fit(spec::HoltWintersSpec, data;
     Exp_mod = getfield(parent_mod, :ExponentialSmoothing)
 
     hw_kwargs = Dict{Symbol, Any}(fit_options)
-    hw_kwargs[:seasonal] = seasonal_str
+    hw_kwargs[:seasonal] = seasonal_sym
     hw_kwargs[:exponential] = exponential
     if !isnothing(damped)
         hw_kwargs[:damped] = damped
@@ -456,29 +456,29 @@ function fit(spec::CrostonSpec, data;
 
     parent_mod = parentmodule(@__MODULE__)
 
-    croston_fit = if spec.method == "hyndman"
+    croston_fit = if spec.method === :hyndman
         Exp_mod = getfield(parent_mod, :ExponentialSmoothing)
         Exp_mod.croston(target_vector, seasonal_period; pairs(fit_options)...)
     else
         ID_mod = getfield(parent_mod, :IntermittentDemand)
 
         id_options = Dict{Symbol, Any}()
-        id_options[:init_strategy] = something(spec.init_strategy, "mean")
+        id_options[:init_strategy] = something(spec.init_strategy, :mean)
         id_options[:number_of_params] = something(spec.number_of_params, 2)
-        id_options[:cost_metric] = something(spec.cost_metric, "mar")
+        id_options[:cost_metric] = something(spec.cost_metric, :mar)
         id_options[:optimize_init] = something(spec.optimize_init, true)
         id_options[:rm_missing] = something(spec.rm_missing, false)
 
         merge!(id_options, fit_options)
 
-        if spec.method == "classic"
+        if spec.method === :classic
             ID_mod.croston_classic(target_vector; pairs(id_options)...)
-        elseif spec.method == "sba"
+        elseif spec.method === :sba
             ID_mod.croston_sba(target_vector; pairs(id_options)...)
-        elseif spec.method == "sbj"
+        elseif spec.method === :sbj
             ID_mod.croston_sbj(target_vector; pairs(id_options)...)
         else
-            throw(ArgumentError("Unknown Croston method: $(spec.method)"))
+            throw(ArgumentError("Unknown Croston method: :$(spec.method)"))
         end
     end
 
@@ -783,7 +783,7 @@ function forecast(fitted::FittedCroston; h::Int, level::Vector{<:Real} = [80, 95
         @warn "newdata ignored for Croston forecasts."
     end
     parent_mod = parentmodule(@__MODULE__)
-    croston_fc = if fitted.spec.method == "hyndman"
+    croston_fc = if fitted.spec.method === :hyndman
         Exp_mod = getfield(parent_mod, :ExponentialSmoothing)
         Exp_mod.forecast(fitted.fit, h)
     else

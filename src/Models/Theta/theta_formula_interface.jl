@@ -21,7 +21,7 @@ fit = @formula(sales = theta(model=:OTM)) |> f -> theta(f, data, m=12)
 fit = @formula(sales = theta(model=:OTM, alpha=0.3)) |> f -> theta(f, data, m=12)
 
 # Force additive decomposition
-fit = @formula(sales = theta(decomposition="additive")) |> f -> theta(f, data, m=12)
+fit = @formula(sales = theta(decomposition=:additive)) |> f -> theta(f, data, m=12)
 
 fit = @formula(sales = theta()) |> f -> theta(f, df, m=12)
 ```
@@ -51,7 +51,7 @@ The function automatically chooses between `auto_theta` (tries all variants) and
 - `theta(model=:DOTM)` - Dynamic Optimized Theta Model (dynamic + optimized)
 - `theta(alpha=value)` - Fix smoothing parameter (0 < α < 1)
 - `theta(theta_param=value)` - Fix theta parameter (≥ 1, ignored for STM/DSTM)
-- `theta(decomposition="multiplicative"|"additive")` - Seasonal decomposition type
+- `theta(decomposition=:multiplicative|:additive)` - Seasonal decomposition type
 - `theta(nmse=value)` - Steps for multi-step MSE calculation (1-30)
 
 # Behavior
@@ -77,9 +77,9 @@ fit = @formula(sales = theta(model=:STM)) |> f -> theta(f, data, m=12)
 
 fit = @formula(sales = theta(model=:OTM, alpha=0.3)) |> f -> theta(f, data, m=12)
 
-fit = @formula(sales = theta(decomposition="additive")) |> f -> theta(f, data, m=12)
+fit = @formula(sales = theta(decomposition=:additive)) |> f -> theta(f, data, m=12)
 
-fit = @formula(sales = theta(model=:DOTM, decomposition="multiplicative", nmse=5)) |>
+fit = @formula(sales = theta(model=:DOTM, decomposition=:multiplicative, nmse=5)) |>
       f -> theta(f, data, m=12)
 
 fc = forecast(fit, 24)

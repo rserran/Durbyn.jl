@@ -60,7 +60,7 @@ longest_contiguous(x)  # Returns [1.0, 2.0, 3.0]
 function longest_contiguous(x::AbstractArray)
     good = [!ismissing(v) && !(v isa AbstractFloat && isnan(v)) for v in x]
     if sum(good) == 0
-        error("all times contain an NA")
+        throw(ArgumentError("all times contain an NA"))
     end
     tt = cumsum(Int[!g for g in good])
     ln = [sum(tt .== i) for i = 0:maximum(tt)]
@@ -230,7 +230,7 @@ function interpolate_missing(x::AbstractVector{T};
 
     non_miss_vals = origx[.!missng]
     if isempty(non_miss_vals)
-        error("All values are missing")
+        throw(ArgumentError("All values are missing"))
     end
     rangex = extrema(non_miss_vals)
     drangex = rangex[2] - rangex[1]

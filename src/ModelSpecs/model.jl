@@ -73,7 +73,7 @@ function model(specs::AbstractModelSpec...; names::Union{Vector{String}, Nothing
         names = ["model_$i" for i in 1:n_specs]
     else
         length(names) == n_specs ||
-            error("Number of names ($(length(names))) must match number of specs ($n_specs)")
+            throw(ArgumentError("Number of names ($(length(names))) must match number of specs ($n_specs)"))
     end
 
     return ModelCollection(specs_vec, names)

@@ -27,7 +27,7 @@ mutable struct BATSModel
     x::Matrix{Float64}
     seed_states::AbstractArray{Float64}
     variance::Float64
-    AIC::Float64
+    aic::Union{Float64,Nothing}
     likelihood::Float64
     optim_return_code::Int
     y::Vector{Float64}
@@ -35,6 +35,9 @@ mutable struct BATSModel
     method::String
     biasadj::Bool
 end
+
+_aic_val(model::Nothing) = Inf
+_aic_val(model) = isnothing(model.aic) ? Inf : model.aic
 
 function bats_descriptor(
     lambda::Union{Float64,Nothing},
@@ -831,7 +834,7 @@ function check_admissibility(
 end
 
 
-function cutW(
+function cut_w(
     use_beta::Bool,
     w_tilda_transpose::AbstractMatrix{T},
     seasonal_periods::AbstractVector{Int},
@@ -1248,7 +1251,7 @@ end
 end
 
 
-function fitSpecificBATS(
+function fit_specific_bats(
     y::AbstractVector{<:Real};
     use_box_cox::Bool,
     use_beta::Bool,
@@ -1405,7 +1408,7 @@ function fitSpecificBATS(
 
     if seasonal_periods !== nothing
 
-        list_cut_w = cutW(use_beta, w_tilda_transpose, seasonal_periods, p, q)
+        list_cut_w = cut_w(use_beta, w_tilda_transpose, seasonal_periods, p, q)
         w_tilda_cut = list_cut_w.matrix
         mask_vector = list_cut_w.mask_vector
 
@@ -1489,7 +1492,7 @@ function fitSpecificBATS(
         opt_result = optimize(
             scaled_param0,
             objective_scaled;
-            method = "Nelder-Mead",
+            method = :nelder_mead,
             control = Dict("maxit" => maxit),
         )
 
@@ -1557,7 +1560,7 @@ function fitSpecificBATS(
             opt_result = optimize(
                 scaled_param0,
                 objective_scaled;
-                method = "Nelder-Mead",
+                method = :nelder_mead,
                 control = Dict("maxit" => maxit),
             )
         else
@@ -1565,7 +1568,7 @@ function fitSpecificBATS(
             opt_result = optimize(
                 scaled_param0,
                 objective_scaled;
-                method = "BFGS",
+                method = :bfgs,
             )
         end
 
@@ -1618,7 +1621,7 @@ function fitSpecificBATS(
         likelihood = likelihood,
         optim_return_code = opt_result.convergence,
         variance = variance,
-        AIC = aic,
+        aic = aic,
         parameters = (vect = opt_par, control = control),
         seed_states = x_nought,
         fitted_values = collect(fitted_values),
@@ -1632,7 +1635,7 @@ function fitSpecificBATS(
     return model
 end
 
-function filterSpecifics(
+function filter_specifics(
     y;
     box_cox::Bool,
     trend::Bool,
@@ -1650,11 +1653,11 @@ function filterSpecifics(
 
     if !trend && damping
 
-        return (AIC = Inf,)
+        return (aic = nothing,)
     end
 
 
-    first_model = fitSpecificBATS(
+    first_model = fit_specific_bats(
         y;
         use_box_cox = box_cox,
         use_beta = trend,
@@ -1672,7 +1675,7 @@ function filterSpecifics(
     best_seasonal_periods = seasonal_periods
 
     if seasonal_periods !== nothing && !force_seasonality
-        non_seasonal_model = fitSpecificBATS(
+        non_seasonal_model = fit_specific_bats(
             y;
             use_box_cox = box_cox,
             use_beta = trend,
@@ -1685,7 +1688,7 @@ function filterSpecifics(
             kwargs...,
         )
 
-        if first_model.AIC > non_seasonal_model.AIC
+        if _aic_val(first_model) > _aic_val(non_seasonal_model)
             best_seasonal_periods = nothing
             first_model = non_seasonal_model
         end
@@ -1710,7 +1713,7 @@ function filterSpecifics(
             starting_params = first_model.parameters
 
 
-            second_model = fitSpecificBATS(
+            second_model = fit_specific_bats(
                 y;
                 use_box_cox = box_cox,
                 use_beta = trend,
@@ -1726,7 +1729,7 @@ function filterSpecifics(
                 kwargs...,
             )
 
-            if second_model.AIC < first_model.AIC
+            if _aic_val(second_model) < _aic_val(first_model)
                 return second_model
             else
                 return first_model
@@ -1872,7 +1875,7 @@ function bats(
 )
 
     if ndims(y) != 1
-        error("y should be a univariate time series (1D vector)")
+        throw(ArgumentError("y should be a univariate time series (1D vector)"))
     end
 
     orig_y = copy(y)
@@ -1929,7 +1932,7 @@ function bats(
         x === nothing ? Bool[false, true] :
         x isa Bool ? Bool[x] :
         x isa AbstractVector{Bool} ? collect(x) :
-        error("use_* arguments must be Bool, Vector{Bool}, or nothing")
+        throw(ArgumentError("use_* arguments must be Bool, Vector{Bool}, or nothing"))
 
     if use_box_cox === nothing
         use_box_cox = [false, true]
@@ -1966,7 +1969,7 @@ function bats(
             for damping in damping_values
                 model_count += 1
                 current_model = try
-                    filterSpecifics(
+                    filter_specifics(
                         y_num,
                         box_cox = box_cox,
                         trend = trend,
@@ -1988,9 +1991,9 @@ function bats(
                     continue
                 end
 
-                aic = getfield(current_model, :AIC)
-                if aic < best_aic
-                    best_aic = aic
+                current_aic = _aic_val(current_model)
+                if current_aic < best_aic
+                    best_aic = current_aic
                     best_model = current_model
                 end
             end
@@ -2029,7 +2032,7 @@ function bats(
         best_model.x,
         best_model.seed_states,
         best_model.variance,
-        best_model.AIC,
+        best_model.aic,
         best_model.likelihood,
         best_model.optim_return_code,
         orig_y,
@@ -2097,7 +2100,7 @@ function create_constant_model(y::Vector{Float64})
         fill(y_mean, 1, n),
         [y_mean],
         0.0,
-        -Inf,
+        nothing,
         -Inf,
         0,
         y,
@@ -2303,5 +2306,7 @@ function Base.show(io::IO, model::BATSModel)
 
     println(io, "")
     println(io, "Sigma:   ", round(sqrt(model.variance), digits = 4))
-    println(io, "AIC:     ", round(model.AIC, digits = 2))
+    if !isnothing(model.aic)
+        println(io, "AIC:     ", round(model.aic, digits = 2))
+    end
 end

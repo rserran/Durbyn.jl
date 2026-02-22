@@ -49,6 +49,17 @@ module ModelSpecs
 using ..Grammar: ModelFormula, VarTerm, AutoVarTerm, ArimaOrderTerm, TbatsTerm, ThetaTerm, DiffusionTerm, compile_ets_formula, NaiveTerm, SnaiveTerm, RwTerm
 using ..Utils: Formula
 
+# Import model types for typed struct fields
+import ..ExponentialSmoothing: SES, Holt, HoltWinters, EtsModel, CrostonFit
+import ..IntermittentDemand: IntermittentDemandCrostonFit
+import ..Arima: ArimaFit
+import ..Bats: BATSModel
+import ..Tbats: TBATSModel
+import ..Theta: ThetaFit
+import ..Diffusion: DiffusionFit
+import ..Naive: NaiveFit, MeanFit
+import ..Ararma: ARAR, ArarmaModel
+
 
 export AbstractModelSpec, AbstractFittedModel
 

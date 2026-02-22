@@ -6,7 +6,7 @@ import Statistics: mean
 using ..Optimize
 using ..Generics
 import ..Utils: evaluation_metrics
-import ..Utils: match_arg
+import ..Utils: _check_arg
 import ..Generics: plot
 import ..Generics: forecast, fitted, residuals
 

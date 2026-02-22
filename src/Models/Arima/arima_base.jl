@@ -23,7 +23,7 @@ mutable struct ArimaStateSpace
     a::AbstractVector
     P::AbstractMatrix
     T::AbstractMatrix
-    V::Any
+    V::Matrix{Float64}
     h::Real
     Pn::AbstractMatrix
 end
@@ -154,7 +154,7 @@ estimated parameters, likelihood and information criteria, residuals, and model 
   Exogenous regressors matrix used in fitting (if any).
 
 - `method::String`  
-  Estimation method (e.g., `"ML"`, `"CSS"`).
+  Estimation method (e.g., `"ML"`, `"CSS"`). Stored as a descriptive string.
 
 - `lambda::Union{Real,Nothing}`  
   Box-Cox transformation parameter used (if any).
@@ -194,7 +194,7 @@ mutable struct ArimaFit
     n_cond::Int
     nobs::Int
     model::ArimaStateSpace
-    xreg::Any
+    xreg::Union{NamedMatrix, Nothing}
     method::String
     lambda::Union{Real, Nothing}
     biasadj::Union{Bool, Nothing}
@@ -858,7 +858,7 @@ function inverse_ar_parameter_transform(ϕ::AbstractVector)
     for j in p:-1:2
         a = new[j]
         denom = 1 - a^2
-        @assert denom ≠ 0 "Encountered unit root at j=$j (a=±1)."
+        denom ≠ 0 || throw(ArgumentError("Encountered unit root at j=$j (a=±1)."))
         for k in 1:j-1
             work[k] = (new[k] + a * new[j-k]) / denom
         end
@@ -894,7 +894,7 @@ function inverse_arima_parameter_transform(θ::AbstractVector, arma::AbstractVec
     mp, mq, msp = arma
     n = length(θ)
     v = mp + mq
-    @assert v + msp ≤ n "Sum mp+mq+msp exceeds length(θ)"
+    v + msp ≤ n || throw(ArgumentError("Sum mp+mq+msp exceeds length(θ)"))
     raw = Array{Float64}(undef, n)
     copy!(raw, θ)
     transformed = raw
@@ -1527,7 +1527,7 @@ function compute_css_residuals(
 end
 
 """
-    initialize_arima_state(phi, theta, Delta; kappa=1e6, SSinit="Gardner1980", tol=eps(Float64))
+    initialize_arima_state(phi, theta, Delta; kappa=1e6, SSinit=:gardner1980, tol=eps(Float64))
 
 Create and initialize the state-space representation of an ARIMA model.
 
@@ -1536,15 +1536,15 @@ this function constructs all state-space matrices required for Kalman filtering 
 This function mirrors the structure and logic of the corresponding C function used in R, and is used internally 
 by high-level ARIMA fitting routines.
 
-The initial state covariance matrix `Pn` is computed either by `compute_q0_covariance_matrix` (for `SSinit="Gardner1980"`)
-or by `compute_q0_bis_covariance_matrix` (for `SSinit="Rossignol2011"`).
+The initial state covariance matrix `Pn` is computed either by `compute_q0_covariance_matrix` (for `SSinit=:gardner1980`)
+or by `compute_q0_bis_covariance_matrix` (for `SSinit=:rossignol2011`).
 
 # Arguments
 - `phi::Vector{Float64}`: Non-seasonal AR coefficients.
 - `theta::Vector{Float64}`: Non-seasonal MA coefficients.
 - `Delta::Vector{Float64}`: Differencing polynomial coefficients.
 - `kappa::Float64`: Prior variance used to initialize the differenced states (default: `1e6`).
-- `SSinit::String`: Method for computing the initial covariance matrix ("Gardner1980" or "Rossignol2011").
+- `SSinit::Symbol`: Method for computing the initial covariance matrix (`:gardner1980` or `:rossignol2011`).
 - `tol::Float64`: Tolerance parameter used by the Rossignol method.
 
 # Returns
@@ -1562,7 +1562,7 @@ or by `compute_q0_bis_covariance_matrix` (for `SSinit="Rossignol2011"`).
 
 """
 # The function is tested works as expected
-function initialize_arima_state(phi::Vector{Float64}, theta::Vector{Float64}, Delta::Vector{Float64}; kappa::Float64=1e6, SSinit::String="Gardner1980", tol::Float64=eps(Float64))
+function initialize_arima_state(phi::Vector{Float64}, theta::Vector{Float64}, Delta::Vector{Float64}; kappa::Float64=1e6, SSinit::Symbol=:gardner1980, tol::Float64=eps(Float64))
     p = length(phi)
     q = length(theta)
     r = max(p, q + 1)
@@ -1598,12 +1598,12 @@ function initialize_arima_state(phi::Vector{Float64}, theta::Vector{Float64}, De
     P = zeros(Float64, rd, rd)
     Pn = zeros(Float64, rd, rd)
     if r > 1
-        if SSinit == "Gardner1980"
+        if SSinit === :gardner1980
             Pn[1:r, 1:r] = compute_q0_covariance_matrix(phi, theta)
-        elseif SSinit == "Rossignol2011"
+        elseif SSinit === :rossignol2011
             Pn[1:r, 1:r] = compute_q0_bis_covariance_matrix(phi, theta, tol)
         else
-            throw(ArgumentError("Invalid value for SSinit: $SSinit"))
+            throw(ArgumentError("Invalid value for SSinit: :$SSinit"))
         end
     else
         if p > 0
@@ -1880,16 +1880,16 @@ function arima(
     transform_pars::Bool = true,
     fixed::Union{Nothing, AbstractArray} = nothing,
     init::Union{Nothing, AbstractArray}= nothing,
-    method::String = "CSS-ML",
+    method::Symbol = :css_ml,
     n_cond::Union{Nothing, AbstractArray} = nothing,
-    SSinit::String = "Gardner1980",
-    optim_method::String = "BFGS",
+    SSinit::Symbol = :gardner1980,
+    optim_method::Symbol = :bfgs,
     optim_control::Dict = Dict(),
     kappa::Real = 1e6,)
 
-    SSinit = match_arg(SSinit, ["Gardner1980", "Rossignol2011"])
-    method = match_arg(method, ["CSS-ML", "ML", "CSS"])
-    SS_G = SSinit == "Gardner1980"
+    _check_arg(SSinit, (:gardner1980, :rossignol2011), "SSinit")
+    _check_arg(method, (:css_ml, :ml, :css), "method")
+    SS_G = SSinit === :gardner1980
 
     kalman_ws = Ref{Union{KalmanWorkspace,Nothing}}(nothing)
 
@@ -1994,18 +1994,18 @@ function arima(
 
     xreg, ncxreg, nmxreg = process_xreg(xreg, n)
 
-    if method == "CSS-ML"
+    if method === :css_ml
         has_missing = xi -> (ismissing(xi) || isnan(xi))
         anyna = any(has_missing, x)
         if ncxreg > 0
             anyna |= any(has_missing, xreg)
         end
         if anyna
-            method = "ML"
+            method = :ml
         end
     end
 
-    if method in ["CSS", "CSS-ML"]
+    if method in (:css, :css_ml)
         ncond = order.d + seasonal.d * m
         ncond1 = order.p + seasonal.p * m
 
@@ -2063,12 +2063,12 @@ function arima(
     end
 
     if n_used <= 0
-        error("Too few non-missing observations")
+        throw(ArgumentError("Too few non-missing observations"))
     end
 
     if !isnothing(init)
         if length(init) != length(init0)
-            error("'init' is of the wrong length")
+            throw(ArgumentError("'init' is of the wrong length"))
         end
 
         ind = map(x -> isnan(x) || ismissing(x), init)
@@ -2076,7 +2076,7 @@ function arima(
            init[ind] .= init0[ind] 
         end
 
-        if method == "ML"
+        if method === :ml
             p = arma[1]  # non-seasonal AR order
             P = arma[3]  # seasonal AR order
             if p > 0
@@ -2099,7 +2099,7 @@ function arima(
 
     coef = copy(Float64.(fixed))
 
-    if method == "CSS"
+    if method === :css
         if no_optim
             res = (converged = true, minimizer = zeros(0), minimum = armaCSS(zeros(0)))
         else
@@ -2159,10 +2159,10 @@ function arima(
         end
 
     else
-        if method in ["CSS-ML", "ML"]
+        if method in (:css_ml, :ml)
             # CSS pre-initialization for better starting values.
             # For ML, temporarily set ncond for CSS computation.
-            if method == "ML"
+            if method === :ml
                 ncond = order.d + seasonal.d * m
                 ncond1 = order.p + seasonal.p * m
                 ncond += isnothing(n_cond) ? ncond1 : max(n_cond, ncond1)
@@ -2345,7 +2345,7 @@ function arima(
     # # Final steps
     value = 2 * n_used * res.minimum + n_used + n_used * log(2 * π)
     
-    if method != "CSS"
+    if method !== :css
         aic = value + 2 * sum(mask) + 2
     else
         aic = nothing

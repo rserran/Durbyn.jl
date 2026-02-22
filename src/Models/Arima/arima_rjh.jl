@@ -25,8 +25,8 @@ function prepare_drift(model::ArimaFit, x, xreg::Union{Nothing,NamedMatrix})
     n_train = length(model.y)
     m_train = Int(model.arma[5])
     t_train = time_index(n_train, m_train)
-    @assert model.xreg isa NamedMatrix "Original model has no xreg for drift reconstruction"
-    @assert any(==("drift"), model.xreg.colnames) "Original model has no 'drift' column"
+    model.xreg isa NamedMatrix || throw(ArgumentError("Original model has no xreg for drift reconstruction"))
+    any(==("drift"), model.xreg.colnames) || throw(ArgumentError("Original model has no 'drift' column"))
 
     drift_vec = get_vector(model.xreg; col = "drift")
 
@@ -49,7 +49,7 @@ function refit_arima_model(
     _m::Int,
     model::ArimaFit,
     xreg::Union{Nothing,NamedMatrix},
-    method::String;
+    method::Symbol;
     kwargs...,
 )
 
@@ -94,7 +94,7 @@ end
         include_constant = nothing,
         lambda = nothing,
         biasadj::Bool = false,
-        method::String = "CSS-ML",
+        method::Symbol = :css_ml,
         model::Union{Nothing,ArimaFit} = nothing,
         kwargs...
     ) -> ArimaFit
@@ -121,10 +121,10 @@ re-apply it to new data `y` without re-estimating parameters.
   - Real value → apply Box-Cox with that λ (`λ = 0` corresponds to log transform, `λ = 1` to no transform).
   - `:auto` (if used) → select λ automatically (BoxCox.lambda equivalent).
 - `biasadj::Bool = false`: When `lambda` is set, use bias-adjusted back-transformation so that fitted values and forecasts approximate **means** on the original scale (otherwise they approximate medians).
-- `method::String = "CSS-ML"`: Estimation method. One of `"CSS-ML"`, `"ML"`, `"CSS"`.
-  - `"CSS-ML"` uses Conditional Sum of Squares for starts, then Maximum Likelihood.
-  - `"ML"` uses full Maximum Likelihood.
-  - `"CSS"` minimizes Conditional Sum of Squares.
+- `method::Symbol = :css_ml`: Estimation method. One of `:css_ml`, `:ml`, `:css`.
+  - `:css_ml` uses Conditional Sum of Squares for starts, then Maximum Likelihood.
+  - `:ml` uses full Maximum Likelihood.
+  - `:css` minimizes Conditional Sum of Squares.
 - `model::Union{Nothing,ArimaFit} = nothing`: Output from a previous call; when provided, the same model structure is refit to `y` **without** re-estimating parameters.
 - `kwargs...`: Passed through to the underlying optimizer/likelihood routine (advanced use).
 
@@ -173,7 +173,7 @@ fit = arima_rjh(
     seasonal = PDQ(0,1,1),
     include_drift = true,
     lambda = :auto,
-    method = "CSS-ML"
+    method = :css_ml
 )
 
 # Refit the same model structure to new data y2
@@ -186,7 +186,7 @@ fitx = arima_rjh(
     seasonal = PDQ(0,1,1),
     xreg = X,
     include_mean = false,
-    method = "ML"
+    method = :ml
 )
 ```
 """
@@ -201,13 +201,13 @@ function arima_rjh(
     include_constant = nothing,
     lambda = nothing,
     biasadj::Bool = false,
-    method::String = "CSS-ML",
+    method::Symbol = :css_ml,
     model::Union{Nothing,ArimaFit} = nothing,
     kwargs...,
 )
 
     x2 = copy(y)
-    method = match_arg(method, ["CSS-ML", "ML", "CSS"])
+    _check_arg(method, (:css_ml, :ml, :css), "method")
 
     if !isnothing(lambda)
         x2, lambda = box_cox(x2, m; lambda = lambda)
@@ -215,9 +215,9 @@ function arima_rjh(
 
     seasonal2 = (m <= 1) ? PDQ(0, 0, 0) : seasonal
     if (m <= 1) && (length(x2) <= order.d)
-        error("Not enough data to fit the model")
+        throw(ArgumentError("Not enough data to fit the model"))
     elseif (m > 1) && (length(x2) <= order.d + seasonal2.d * m)
-        error("Not enough data to fit the model")
+        throw(ArgumentError("Not enough data to fit the model"))
     end
 
     if !isnothing(include_constant)
@@ -242,7 +242,7 @@ function arima_rjh(
         use_drift = had_xreg && any(==("drift"), model.xreg.colnames)
 
         if had_xreg && isnothing(xreg)
-            error("No regressors provided")
+            throw(ArgumentError("No regressors provided"))
         end
 
         xreg2 =

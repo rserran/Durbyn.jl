@@ -7,7 +7,7 @@ function Base.show(io::IO, model::EtsModel)
     error_type = model.components[1]
     trend_type = model.components[2]
     season_type = model.components[3]
-    damped = Bool(model.components[4])
+    damped = parse(Bool, model.components[4])
 
     # Model name
     model_str = "ETS($error_type,$trend_type"

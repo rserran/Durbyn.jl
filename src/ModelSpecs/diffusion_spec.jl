@@ -115,7 +115,7 @@ fc = forecast(fitted, h=12)
 """
 struct FittedDiffusion <: AbstractFittedModel
     spec::DiffusionSpec
-    fit::Any
+    fit::DiffusionFit
     target_col::Symbol
     data_schema::Dict{Symbol, Type}
 

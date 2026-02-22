@@ -121,7 +121,7 @@ fitted.fit.ar_coefficients     # AR coefficients (if present)
 fitted.fit.ma_coefficients     # MA coefficients (if present)
 fitted.fit.fitted_values       # Fitted values
 fitted.fit.variance            # Residual variance
-fitted.fit.AIC                 # AIC
+fitted.fit.aic                 # AIC (nothing for constant model)
 
 # Generate forecasts
 fc = forecast(fitted, h = 12)
@@ -134,7 +134,7 @@ fc = forecast(fitted, h = 12)
 """
 struct FittedBats <: AbstractFittedModel
     spec::BatsSpec
-    fit::Any
+    fit::BATSModel
     target_col::Symbol
     data_schema::Dict{Symbol, Type}
 
@@ -152,8 +152,8 @@ end
 
 function extract_metrics(model::FittedBats)
     metrics = Dict{Symbol, Float64}()
-    if isfinite(model.fit.AIC)
-        metrics[:aic] = model.fit.AIC
+    if !isnothing(model.fit.aic)
+        metrics[:aic] = model.fit.aic
     end
     if isfinite(model.fit.likelihood)
         metrics[:loglik] = model.fit.likelihood
@@ -168,8 +168,8 @@ end
 
 function Base.show(io::IO, fitted::FittedBats)
     print(io, "FittedBats: ", fitted.fit.method)
-    if isfinite(fitted.fit.AIC)
-        print(io, ", AIC = ", round(fitted.fit.AIC, digits=2))
+    if !isnothing(fitted.fit.aic)
+        print(io, ", AIC = ", round(fitted.fit.aic, digits=2))
     end
 end
 
@@ -187,8 +187,8 @@ function Base.show(io::IO, ::MIME"text/plain", fitted::FittedBats)
     if !isnothing(fitted.fit.damping_parameter)
         println(io, "  Damping: ", round(fitted.fit.damping_parameter, digits=4))
     end
-    if isfinite(fitted.fit.AIC)
-        println(io, "  AIC: ", round(fitted.fit.AIC, digits=4))
+    if !isnothing(fitted.fit.aic)
+        println(io, "  AIC: ", round(fitted.fit.aic, digits=4))
     end
     println(io, "  σ²: ", round(fitted.fit.variance, digits=6))
     println(io, "  n: ", length(fitted.fit.y))

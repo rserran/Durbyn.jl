@@ -275,7 +275,7 @@ end
 # -----------------------------------------------------------------
 @testset "HoltWintersSpec" begin
     @testset "Basic fit (additive)" begin
-        spec = HoltWintersSpec(@formula(y = hw(seasonal="additive")))
+        spec = HoltWintersSpec(@formula(y = hw(seasonal=:additive)))
         data = (y = AP_LONG_MS,)
         fitted_model = fit(spec, data, m=12)
 
@@ -284,7 +284,7 @@ end
     end
 
     @testset "Forecast" begin
-        spec = HoltWintersSpec(@formula(y = hw(seasonal="additive")))
+        spec = HoltWintersSpec(@formula(y = hw(seasonal=:additive)))
         data = (y = AP_LONG_MS,)
         fitted_model = fit(spec, data, m=12)
         fc = forecast(fitted_model, h=12)
@@ -295,7 +295,7 @@ end
     end
 
     @testset "Extract metrics" begin
-        spec = HoltWintersSpec(@formula(y = hw(seasonal="additive")))
+        spec = HoltWintersSpec(@formula(y = hw(seasonal=:additive)))
         data = (y = AP_LONG_MS,)
         fitted_model = fit(spec, data, m=12)
         metrics = extract_metrics(fitted_model)
@@ -307,7 +307,7 @@ end
     end
 
     @testset "Multiplicative seasonal" begin
-        spec = HoltWintersSpec(@formula(y = hw(seasonal="multiplicative")))
+        spec = HoltWintersSpec(@formula(y = hw(seasonal=:multiplicative)))
         data = (y = AP_LONG_MS,)
         fitted_model = fit(spec, data, m=12)
 
@@ -315,7 +315,7 @@ end
     end
 
     @testset "Damped HoltWinters" begin
-        spec = HoltWintersSpec(@formula(y = hw(seasonal="additive", damped=true)))
+        spec = HoltWintersSpec(@formula(y = hw(seasonal=:additive, damped=true)))
         data = (y = AP_LONG_MS,)
         fitted_model = fit(spec, data, m=12)
 
@@ -324,7 +324,7 @@ end
 
     @testset "Grouped fit" begin
         gdata = make_grouped_long_data_ms()
-        spec = HoltWintersSpec(@formula(y = hw(seasonal="additive")))
+        spec = HoltWintersSpec(@formula(y = hw(seasonal=:additive)))
         fitted_model = fit(spec, gdata, m=12, groupby=:group)
 
         @test fitted_model isa GroupedFittedModels
@@ -332,7 +332,7 @@ end
     end
 
     @testset "Target validation" begin
-        spec = HoltWintersSpec(@formula(nonexistent = hw(seasonal="additive")))
+        spec = HoltWintersSpec(@formula(nonexistent = hw(seasonal=:additive)))
         data = (y = AP_LONG_MS,)
         @test_throws ArgumentError fit(spec, data, m=12)
     end
@@ -371,21 +371,21 @@ end
     end
 
     @testset "Method classic" begin
-        spec = CrostonSpec(@formula(y = croston(method="classic")))
+        spec = CrostonSpec(@formula(y = croston(method=:classic)))
         data = (y = INTERMITTENT_MS,)
         fitted_model = fit(spec, data, m=1)
         @test fitted_model isa FittedCroston
     end
 
     @testset "Method sba" begin
-        spec = CrostonSpec(@formula(y = croston(method="sba")))
+        spec = CrostonSpec(@formula(y = croston(method=:sba)))
         data = (y = INTERMITTENT_MS,)
         fitted_model = fit(spec, data, m=1)
         @test fitted_model isa FittedCroston
     end
 
     @testset "Method sbj" begin
-        spec = CrostonSpec(@formula(y = croston(method="sbj")))
+        spec = CrostonSpec(@formula(y = croston(method=:sbj)))
         data = (y = INTERMITTENT_MS,)
         fitted_model = fit(spec, data, m=1)
         @test fitted_model isa FittedCroston

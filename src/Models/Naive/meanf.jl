@@ -44,7 +44,7 @@ The mean method uses the sample mean as the forecast for all future periods.
 - `biasadj::Bool=false` - Apply bias adjustment for Box-Cox back-transformation
 """
 function meanf(y::AbstractArray, m::Int=1;
-               lambda::Union{Nothing, Float64, String}=nothing,
+               lambda::Union{Nothing, Float64, Symbol}=nothing,
                biasadj::Bool=false)
     n_orig = length(y)
 
@@ -58,7 +58,7 @@ function meanf(y::AbstractArray, m::Int=1;
     n_valid >= 1 || throw(ArgumentError("Time series must have at least 1 non-missing/non-NaN observation"))
 
     if !isnothing(lambda)
-        if lambda isa String
+        if lambda isa Symbol
             transform_mask = valid_mask .& (x_orig .> 0)
         elseif lambda <= 0
             transform_mask = valid_mask .& (x_orig .> 0)
@@ -137,7 +137,7 @@ function meanf(y::AbstractArray, m::Int=1;
     return MeanFit(x_orig, mu_trans, mu_original, sd_trans, lambda, biasadj, fitted, residuals, n, m)
 end
 
-function meanf(y::AbstractArray, m::Int, lambda::Union{Nothing, Float64, String})
+function meanf(y::AbstractArray, m::Int, lambda::Union{Nothing, Float64, Symbol})
     meanf(y, m; lambda=lambda, biasadj=false)
 end
 
@@ -171,7 +171,7 @@ function forecast(object::MeanFit;
         if all_fraction
             level = 100.0 .* level
         elseif any(lv -> lv <= 0.0 || lv > 99.99, level)
-            error("Confidence levels must be in (0, 1) (fractions) or (0, 99.99] (percentages)")
+            throw(ArgumentError("Confidence levels must be in (0, 1) (fractions) or (0, 99.99] (percentages)"))
         end
     end
 

@@ -145,7 +145,7 @@ import Durbyn.Generics: forecast, fitted, residuals
     @testset "manually constructed model with missings errors on forecast/fitted" begin
         # Simulate a user manually constructing a model with dirty data
         bad_model = IntermittentDemandCrostonFit(
-            [0.1, 0.1], [2.0, 3.0], "croston", true, [6, missing, 0, 1, 0, 0, 2]
+            [0.1, 0.1], [2.0, 3.0], :croston, true, [6, missing, 0, 1, 0, 0, 2]
         )
         @test_throws ArgumentError forecast(bad_model, h=5)
         @test_throws ArgumentError fitted(bad_model)

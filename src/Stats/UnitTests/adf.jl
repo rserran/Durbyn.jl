@@ -46,7 +46,6 @@ end
 
 """
     adf(y; type::Symbol = :none, lags::Int = 1, selectlags::Symbol = :fixed) -> ADF
-    adf(;y, type::String="none", lags::Int=1, selectlags::String="fixed") -> ADF
 
 Perform the Augmented Dickey-Fuller (ADF) unit-root test.
 
@@ -114,22 +113,22 @@ julia> adf(y = ap)
 """
 function adf(y; type::Symbol=:none, lags::Int=1, selectlags::Symbol=:fixed)
 
-    type ∈ (:none, :drift, :trend) || error("type must be :none, :drift, or :trend")
-    selectlags ∈ (:fixed, :aic, :bic) || error("selectlags must be :fixed, :aic, or :bic")
+    type ∈ (:none, :drift, :trend) || throw(ArgumentError("type must be :none, :drift, or :trend"))
+    selectlags ∈ (:fixed, :aic, :bic) || throw(ArgumentError("selectlags must be :fixed, :aic, or :bic"))
 
     yv = _skipmissing_to_vec(y)
     (nd,) = size(yv)
-    nd > 1 || error("y is not a vector or too short")
-    any(isnan.(yv)) && error("NAs in y")
+    nd > 1 || throw(ArgumentError("y is not a vector or too short"))
+    any(isnan.(yv)) && throw(ArgumentError("NAs in y"))
 
     lag = Int(lags)
-    lag >= 0 || error("lags must be a nonnegative integer")
+    lag >= 0 || throw(ArgumentError("lags must be a nonnegative integer"))
 
     L = lag + 1
     z = diff(yv)
     z = _skipmissing_to_vec(z)
     n = length(z)
-    n >= L || error("Not enough observations for the requested lags")
+    n >= L || throw(ArgumentError("Not enough observations for the requested lags"))
 
     x = embed(z, L)
     T = size(x, 1)
@@ -297,14 +296,6 @@ function adf(y; type::Symbol=:none, lags::Int=1, selectlags::Symbol=:fixed)
     return ADF(type, cvals, clevels, chosen_L - 1, out.teststat, out.fit, out.res, names)
 end
 
-function adf(;y, type::String="none", lags::Int=1, selectlags::String="fixed")
-    type = match_arg(type, ["none", "drift", "trend"])
-    selectlags = match_arg(selectlags, ["fixed", "aic", "bic"])
-    type = Symbol(type)
-    selectlags = Symbol(selectlags)
-
-    return adf(y; type = type, lags = lags, selectlags = selectlags)
-end
 
 function summary(x::ADF)
     vals = join(string.(round.(collect(x.teststat); digits=4)), ", ")

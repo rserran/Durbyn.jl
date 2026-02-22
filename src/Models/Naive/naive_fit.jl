@@ -77,7 +77,7 @@ fc = forecast(fit, h=10)
 - [`rw`](@ref) - Random walk with optional drift
 """
 function naive(y::AbstractVector, m::Int=1;
-               lambda::Union{Nothing, Float64, String}=nothing,
+               lambda::Union{Nothing, Float64, Symbol}=nothing,
                biasadj::Bool=false)
     n = length(y)
     n >= 2 || throw(ArgumentError("Time series must have at least 2 observations, got $n"))
@@ -95,7 +95,7 @@ function naive(y::AbstractVector, m::Int=1;
     if !isnothing(lambda)
         valid_mask = .!isnan.(x)
 
-        if lambda isa String
+        if lambda isa Symbol
             transform_mask = valid_mask .& (x .> 0)
         elseif lambda <= 0
             transform_mask = valid_mask .& (x .> 0)
@@ -241,7 +241,7 @@ fc = forecast(fit, h=8)
 - [`rw`](@ref) - Random walk with optional drift
 """
 function snaive(y::AbstractVector, m::Int;
-                lambda::Union{Nothing, Float64, String}=nothing,
+                lambda::Union{Nothing, Float64, Symbol}=nothing,
                 biasadj::Bool=false)
     m >= 1 || throw(ArgumentError("Seasonal period m must be >= 1, got $m"))
 
@@ -261,7 +261,7 @@ function snaive(y::AbstractVector, m::Int;
     if !isnothing(lambda)
         valid_mask = .!isnan.(x)
 
-        if lambda isa String
+        if lambda isa Symbol
             transform_mask = valid_mask .& (x .> 0)
         elseif lambda <= 0
             transform_mask = valid_mask .& (x .> 0)
@@ -409,7 +409,7 @@ fc = forecast(fit2, h=10)
 """
 function rw(y::AbstractVector, m::Int=1;
             drift::Bool=false,
-            lambda::Union{Nothing, Float64, String}=nothing,
+            lambda::Union{Nothing, Float64, Symbol}=nothing,
             biasadj::Bool=false)
     n = length(y)
     n >= 2 || throw(ArgumentError("Time series must have at least 2 observations, got $n"))
@@ -427,7 +427,7 @@ function rw(y::AbstractVector, m::Int=1;
     if !isnothing(lambda)
         valid_mask = .!isnan.(x)
 
-        if lambda isa String
+        if lambda isa Symbol
             transform_mask = valid_mask .& (x .> 0)
         elseif lambda <= 0
             transform_mask = valid_mask .& (x .> 0)
@@ -665,7 +665,7 @@ function rwf(y::AbstractVector, m::Int=1;
              h::Int=10,
              level::Vector{<:Real}=[80, 95],
              drift::Bool=false,
-             lambda::Union{Nothing, Float64, String}=nothing,
+             lambda::Union{Nothing, Float64, Symbol}=nothing,
              biasadj::Bool=false,
              fan::Bool=false)
     fit = rw(y, m; drift=drift, lambda=lambda, biasadj=biasadj)

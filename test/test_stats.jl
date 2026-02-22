@@ -149,10 +149,10 @@ const REF_KPSS_STAT_AP = 2.8767
         ap = AirPassengers
 
         @testset "box_cox_lambda estimation" begin
-            lambda_guer = box_cox_lambda(ap, 12; method="guerrero")
+            lambda_guer = box_cox_lambda(ap, 12; method=:guerrero)
             @test -1.0 <= lambda_guer <= 2.0
 
-            lambda_loglik = box_cox_lambda(ap, 12; method="loglik")
+            lambda_loglik = box_cox_lambda(ap, 12; method=:loglik)
             @test -1.0 <= lambda_loglik <= 2.0
 
             @test abs(lambda_guer - lambda_loglik) < 0.5
@@ -205,7 +205,7 @@ const REF_KPSS_STAT_AP = 2.8767
         ap = AirPassengers
 
         @testset "Additive decomposition" begin
-            result = decompose(x=ap, m=12, type="additive")
+            result = decompose(x=ap, m=12, type=:additive)
 
             @test length(result.seasonal) == length(ap)
             @test length(result.trend) == length(ap)
@@ -224,7 +224,7 @@ const REF_KPSS_STAT_AP = 2.8767
         end
 
         @testset "Multiplicative decomposition" begin
-            result = decompose(x=ap, m=12, type="multiplicative")
+            result = decompose(x=ap, m=12, type=:multiplicative)
 
             @test abs(mean(result.figure) - 1.0) <= EPS_VECTOR
 
@@ -235,15 +235,15 @@ const REF_KPSS_STAT_AP = 2.8767
 
         @testset "Decomposition with custom filter" begin
             custom_filter = ones(12) ./ 12
-            result = decompose(x=ap, m=12, type="additive", filter=custom_filter)
+            result = decompose(x=ap, m=12, type=:additive, filter=custom_filter)
 
             @test length(result.trend) == length(ap)
         end
 
         @testset "Decomposition error handling" begin
-            @test_throws ErrorException decompose(x=ap[1:10], m=12, type="additive")
-            @test_throws ErrorException decompose(x=ap, m=1, type="additive")
-            @test_throws ErrorException decompose(x=ap, m=12, type="invalid")
+            @test_throws ArgumentError decompose(x=ap[1:10], m=12, type=:additive)
+            @test_throws ArgumentError decompose(x=ap, m=1, type=:additive)
+            @test_throws ArgumentError decompose(x=ap, m=12, type=:invalid)
         end
     end
 
@@ -281,9 +281,9 @@ const REF_KPSS_STAT_AP = 2.8767
             @test 0 <= result_bic.lag <= 10
         end
 
-        @testset "ADF keyword interface" begin
+        @testset "ADF positional interface" begin
             result1 = adf(ap; type=:drift)
-            result2 = adf(y=ap, type="drift")
+            result2 = adf(ap; type=:drift)
 
             @test abs(result1.teststat.data[1] - result2.teststat.data[1]) <= EPS_SCALAR
         end
@@ -585,12 +585,12 @@ const REF_KPSS_STAT_AP = 2.8767
 
         @testset "Error on all missing" begin
             x = Union{Float64,Missing}[missing, missing, missing]
-            @test_throws ErrorException interpolate_missing(x)
+            @test_throws ArgumentError interpolate_missing(x)
         end
 
         @testset "Single non-missing value - requires at least two" begin
             x = Union{Float64,Missing}[missing, 5.0, missing]
-            @test_throws ErrorException interpolate_missing(x; linear=true)
+            @test_throws ArgumentError interpolate_missing(x; linear=true)
         end
 
         @testset "Integer input converted to Float" begin
@@ -640,7 +640,7 @@ const REF_KPSS_STAT_AP = 2.8767
         end
 
         @testset "mstl with lambda" begin
-            res = mstl(AirPassengers, 12; lambda="auto")
+            res = mstl(AirPassengers, 12; lambda=:auto)
             @test isa(res, MSTLResult)
             @test !isnothing(res.lambda)
         end
@@ -732,8 +732,8 @@ const REF_KPSS_STAT_AP = 2.8767
         end
 
         @testset "BoxCox.lambda matches R (guerrero & loglik)" begin
-            λ_guer = box_cox_lambda(AirPassengers, 12; method="guerrero")
-            λ_loglik = box_cox_lambda(AirPassengers, 12; method="loglik")
+            λ_guer = box_cox_lambda(AirPassengers, 12; method=:guerrero)
+            λ_loglik = box_cox_lambda(AirPassengers, 12; method=:loglik)
             @test isapprox(λ_guer, -0.2947156, atol=0.05)
             @test isapprox(λ_loglik, 0.2, atol=0.1)
         end
@@ -779,7 +779,7 @@ const REF_KPSS_STAT_AP = 2.8767
         end
 
         @testset "mstl(AP,12; lambda='auto') matches R lambda selection" begin
-            res = mstl(AirPassengers, 12; lambda="auto")
+            res = mstl(AirPassengers, 12; lambda=:auto)
             @test !isnothing(res.lambda)
             @test -1.0 < res.lambda < 2.0
         end
@@ -840,12 +840,12 @@ const REF_KPSS_STAT_AP = 2.8767
 
     @testset "Round 2 Bug Fixes + R Parity" begin
 
-        @testset "ndiffs string-API passes type and max_d correctly" begin
-            @test ndiffs(; x=AirPassengers, test="kpss", type="level", max_d=0) == 0
+        @testset "ndiffs positional-API passes deterministic and maxd correctly" begin
+            @test ndiffs(AirPassengers; test=:kpss, deterministic=:level, maxd=0) == 0
 
-            @test ndiffs(; x=AirPassengers, test="kpss", type="level") == 1
+            @test ndiffs(AirPassengers; test=:kpss, deterministic=:level) == 1
 
-            @test ndiffs(; x=AirPassengers, test="kpss", type="trend") == 0
+            @test ndiffs(AirPassengers; test=:kpss, deterministic=:trend) == 0
         end
 
         @testset "ndiffs matches R forecast::ndiffs" begin
@@ -859,10 +859,8 @@ const REF_KPSS_STAT_AP = 2.8767
 
             @test ndiffs(AirPassengers; test=:adf, deterministic=:trend) == 0
 
-            @test ndiffs(AirPassengers; test=:kpss, deterministic=:level) ==
-                  ndiffs(; x=AirPassengers, test="kpss", type="level")
-            @test ndiffs(AirPassengers; test=:kpss, deterministic=:trend) ==
-                  ndiffs(; x=AirPassengers, test="kpss", type="trend")
+            @test ndiffs(AirPassengers; test=:kpss, deterministic=:level) == 1
+            @test ndiffs(AirPassengers; test=:kpss, deterministic=:trend) == 0
         end
 
         @testset "diff integer matrix returns Float64 with NaN" begin
@@ -936,12 +934,12 @@ const REF_KPSS_STAT_AP = 2.8767
         @testset "guerrero accepts non-Float64 input" begin
             int_data = Int[10, 12, 15, 11, 13, 16, 12, 14, 17, 13,
                            15, 18, 14, 16, 19, 15, 17, 20, 16, 18]
-            λ = box_cox_lambda(int_data, 4; method="guerrero")
+            λ = box_cox_lambda(int_data, 4; method=:guerrero)
             @test -1.0 <= λ <= 2.0
 
             f32_data = Float32[10, 12, 15, 11, 13, 16, 12, 14, 17, 13,
                                15, 18, 14, 16, 19, 15, 17, 20, 16, 18]
-            λ32 = box_cox_lambda(f32_data, 4; method="guerrero")
+            λ32 = box_cox_lambda(f32_data, 4; method=:guerrero)
             @test -1.0 <= λ32 <= 2.0
 
             @test isapprox(λ, λ32, atol=0.01)
@@ -950,11 +948,11 @@ const REF_KPSS_STAT_AP = 2.8767
         @testset "bcloglik handles NaN as missing" begin
             clean = Float64[10, 12, 15, 11, 13, 16, 12, 14, 17, 13,
                             15, 18, 14, 16, 19, 15, 17, 20, 16, 18]
-            λ_clean = box_cox_lambda(clean, 4; method="loglik")
+            λ_clean = box_cox_lambda(clean, 4; method=:loglik)
 
             with_nan = copy(clean)
             with_nan[5] = NaN
-            λ_nan = box_cox_lambda(with_nan, 4; method="loglik")
+            λ_nan = box_cox_lambda(with_nan, 4; method=:loglik)
 
             @test !isnan(λ_nan)
             @test -1.0 <= λ_nan <= 2.0
@@ -963,11 +961,11 @@ const REF_KPSS_STAT_AP = 2.8767
         @testset "guerrero handles NaN as missing" begin
             clean = Float64[10, 12, 15, 11, 13, 16, 12, 14, 17, 13,
                             15, 18, 14, 16, 19, 15, 17, 20, 16, 18]
-            λ_clean = box_cox_lambda(clean, 4; method="guerrero")
+            λ_clean = box_cox_lambda(clean, 4; method=:guerrero)
 
             with_nan = copy(clean)
             with_nan[5] = NaN
-            λ_nan = box_cox_lambda(with_nan, 4; method="guerrero")
+            λ_nan = box_cox_lambda(with_nan, 4; method=:guerrero)
 
             @test !isnan(λ_nan)
             @test -1.0 <= λ_nan <= 2.0

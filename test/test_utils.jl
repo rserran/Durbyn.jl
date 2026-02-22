@@ -295,7 +295,7 @@ const EPS_SCALAR = 1e-10
 
         @testset "All missing should error" begin
             x = [missing, missing, missing]
-            @test_throws ErrorException longest_contiguous(x)
+            @test_throws ArgumentError longest_contiguous(x)
         end
     end
 
@@ -325,7 +325,7 @@ const EPS_SCALAR = 1e-10
 
         @testset "Multi-dimensional should error" begin
             X = [1.0 2.0; 3.0 4.0]
-            @test_throws ErrorException as_vector(X)
+            @test_throws ArgumentError as_vector(X)
         end
     end
 

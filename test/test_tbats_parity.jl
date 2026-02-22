@@ -10,7 +10,7 @@ import Durbyn.Generics: Forecast, forecast
     @test fit isa TBATSModel
 
     @test fit.alpha ≈ 1.206920724927324 rtol=1e-6
-    @test fit.AIC ≈ 1552.191520930223533 rtol=1e-6
+    @test fit.aic ≈ 1552.191520930223533 rtol=1e-6
     @test fit.variance ≈ 274.472216315131220 rtol=1e-6
     @test isnothing(fit.beta)
     @test isnothing(fit.damping_parameter)
@@ -39,7 +39,7 @@ end
     @test fit.alpha ≈ 1.278287183275996 rtol=1e-6
     @test fit.beta ≈ -0.132712913219964 rtol=1e-4
     @test fit.damping_parameter ≈ 0.800496054382298 rtol=1e-4
-    @test fit.AIC ≈ 1558.761799728193182 rtol=1e-6
+    @test fit.aic ≈ 1558.761799728193182 rtol=1e-6
     @test fit.variance ≈ 275.561355461636708 rtol=1e-6
     @test fit.k_vector == [5]
 
@@ -68,7 +68,7 @@ end
     @test fit.alpha ≈ 0.763619800802097 rtol=0.01
     @test fit.beta ≈ 0.035183419858474 rtol=0.02
     @test fit.damping_parameter ≈ 0.989857669723660 rtol=0.001
-    @test fit.AIC ≈ 1400.700441721485959 rtol=0.001
+    @test fit.aic ≈ 1400.700441721485959 rtol=0.001
     @test fit.k_vector == [5]
 
     expected_fc = [447.074104914059035, 437.884140051731833, 504.542810874353734,

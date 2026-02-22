@@ -54,7 +54,7 @@ Specification wrapper for Holt-Winters seasonal exponential smoothing (`hw()`/`h
 struct HoltWintersSpec <: AbstractModelSpec
     formula::ModelFormula
     m::Union{Int, Nothing}
-    seasonal::String
+    seasonal::Symbol
     damped::Union{Bool, Nothing}
     exponential::Bool
     options::Dict{Symbol, Any}
@@ -65,9 +65,9 @@ struct HoltWintersSpec <: AbstractModelSpec
         term = _extract_single_term(formula, HoltWintersTerm)
         opts = Dict{Symbol, Any}(kwargs)
         seasonal = haskey(opts, :seasonal) ? pop!(opts, :seasonal) : term.seasonal
-        seasonal_str = lowercase(String(seasonal))
-        seasonal_str in ("additive", "multiplicative") ||
-            throw(ArgumentError("seasonal must be \"additive\" or \"multiplicative\", got $(seasonal)"))
+        seasonal_sym = seasonal isa AbstractString ? Symbol(lowercase(seasonal)) : seasonal
+        seasonal_sym in (:additive, :multiplicative) ||
+            throw(ArgumentError("seasonal must be :additive or :multiplicative, got :$(seasonal_sym)"))
         damped = haskey(opts, :damped) ? pop!(opts, :damped) : term.damped
         if !(damped === nothing || damped isa Bool)
             throw(ArgumentError("damped must be Bool or nothing, got $(typeof(damped))"))
@@ -75,10 +75,10 @@ struct HoltWintersSpec <: AbstractModelSpec
         exponential = haskey(opts, :exponential) ? pop!(opts, :exponential) : term.exponential
         exponential isa Bool ||
             throw(ArgumentError("exponential must be Bool, got $(typeof(exponential))"))
-        if exponential && seasonal_str == "additive"
+        if exponential && seasonal_sym === :additive
             throw(ArgumentError("exponential trend cannot be combined with additive seasonality."))
         end
-        new(formula, m, seasonal_str, damped, exponential, opts)
+        new(formula, m, seasonal_sym, damped, exponential, opts)
     end
 end
 
@@ -88,19 +88,19 @@ end
 Specification wrapper for Croston's intermittent demand method (`croston()`).
 
 Supports multiple Croston method variants:
-- `"hyndman"` - Simple Croston from ExponentialSmoothing module (default)
-- `"classic"` - Classical Croston from IntermittentDemand module
-- `"sba"` - Syntetos-Boylan Approximation (bias-corrected, recommended for intermittent demand)
-- `"sbj"` - Shale-Boylan-Johnston Bias Correction
+- `:hyndman` - Simple Croston from ExponentialSmoothing module (default)
+- `:classic` - Classical Croston from IntermittentDemand module
+- `:sba` - Syntetos-Boylan Approximation (bias-corrected, recommended for intermittent demand)
+- `:sbj` - Shale-Boylan-Johnston Bias Correction
 """
 struct CrostonSpec <: AbstractModelSpec
     formula::ModelFormula
     m::Union{Int, Nothing}
-    method::String
+    method::Symbol
     # IntermittentDemand-specific parameters
-    init_strategy::Union{String, Nothing}
+    init_strategy::Union{Symbol, Nothing}
     number_of_params::Union{Int, Nothing}
-    cost_metric::Union{String, Nothing}
+    cost_metric::Union{Symbol, Nothing}
     optimize_init::Union{Bool, Nothing}
     rm_missing::Union{Bool, Nothing}
     options::Dict{Symbol, Any}
@@ -120,7 +120,7 @@ end
 """
 struct FittedSes <: AbstractFittedModel
     spec::SesSpec
-    fit::Any
+    fit::SES
     target_col::Symbol
     data_schema::Dict{Symbol, Type}
     m::Int
@@ -143,7 +143,7 @@ end
 """
 struct FittedHolt <: AbstractFittedModel
     spec::HoltSpec
-    fit::Any
+    fit::Holt
     target_col::Symbol
     data_schema::Dict{Symbol, Type}
     m::Int
@@ -166,7 +166,7 @@ end
 """
 struct FittedHoltWinters <: AbstractFittedModel
     spec::HoltWintersSpec
-    fit::Any
+    fit::HoltWinters
     target_col::Symbol
     data_schema::Dict{Symbol, Type}
     m::Int
@@ -189,7 +189,7 @@ end
 """
 struct FittedCroston <: AbstractFittedModel
     spec::CrostonSpec
-    fit::Any
+    fit::Union{CrostonFit, IntermittentDemandCrostonFit}
     target_col::Symbol
     data_schema::Dict{Symbol, Type}
     m::Int
@@ -272,7 +272,7 @@ end
 
 function Base.show(io::IO, spec::HoltWintersSpec)
     print(io, "HoltWintersSpec: ", spec.formula.target,
-          ", seasonal = \"", spec.seasonal, "\"")
+          ", seasonal = :", spec.seasonal)
     if !isnothing(spec.damped)
         print(io, ", damped = ", spec.damped)
     end
@@ -285,7 +285,7 @@ function Base.show(io::IO, spec::HoltWintersSpec)
 end
 
 function Base.show(io::IO, spec::CrostonSpec)
-    print(io, "CrostonSpec(", spec.method, "): ", spec.formula.target)
+    print(io, "CrostonSpec(:", spec.method, "): ", spec.formula.target)
     if !isnothing(spec.m)
         print(io, ", m = ", spec.m)
     end
@@ -309,7 +309,7 @@ function Base.show(io::IO, fitted::FittedHolt)
 end
 
 function Base.show(io::IO, fitted::FittedHoltWinters)
-    print(io, "FittedHoltWinters: Holt-Winters(", fitted.spec.seasonal, ")")
+    print(io, "FittedHoltWinters: Holt-Winters(:", fitted.spec.seasonal, ")")
     if hasproperty(fitted.fit, :aic) && !isnothing(fitted.fit.aic)
         print(io, ", AIC = ", round(fitted.fit.aic, digits=2))
     end

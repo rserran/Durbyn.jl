@@ -207,7 +207,7 @@ end
 @testset "ARIMAX parity: CSS method ARIMA(1,0,0)(0,1,0)[12]" begin
     fit = arima_rjh(AP, 12;
         order=PDQ(1,0,0), seasonal=PDQ(0,1,0),
-        xreg=XREG_SINGLE, include_mean=false, method="CSS")
+        xreg=XREG_SINGLE, include_mean=false, method=:css)
     @test fit isa ArimaFit
 
     coefs = vec(fit.coef.data)

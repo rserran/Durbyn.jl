@@ -24,7 +24,7 @@ function as_vector(x::AbstractMatrix)
     if r == 1 || c == 1
         return vec(x)   # turn 1×N or M×1 into a Vector
     else
-        error("Matrix must have exactly 1 row or 1 column; got $(r)×$(c).")
+        throw(ArgumentError("Matrix must have exactly 1 row or 1 column; got $(r)×$(c)."))
     end
 end
 
@@ -232,7 +232,7 @@ println(X_clean)  # Output: [1.0 2.0; 5.0 6.0]
 ```
 """
 function dropmissing(x::AbstractVector, X::AbstractMatrix)
-    @assert length(x) == size(X, 1) "x and X must have the same number of rows"
+    length(x) == size(X, 1) || throw(ArgumentError("x and X must have the same number of rows"))
     function row_ok(i)
         xi = x[i]
         Xi = X[i, :]
@@ -265,7 +265,13 @@ function duplicated(arr::Vector{T})::Vector{Bool} where {T}
 end
 
 function match_arg(arg, choices)
-    return !isnothing(findfirst(x -> x == arg, choices)) ? arg : error("Invalid argument")
+    return !isnothing(findfirst(x -> x == arg, choices)) ? arg : throw(ArgumentError("Invalid argument: $arg. Must be one of: $(join(choices, ", "))"))
+end
+
+function _check_arg(arg::Symbol, choices, name::String="argument")
+    arg in choices || throw(ArgumentError(
+        "Invalid $name: :$arg. Must be one of: $(join(choices, ", "))"))
+    return arg
 end
 
 function completecases(x::AbstractArray)

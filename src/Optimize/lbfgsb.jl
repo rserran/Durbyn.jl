@@ -1100,7 +1100,7 @@ function lbfgsb(f::Function, g::Function, x0::Vector{Float64};
     n = length(x0)
     m = options.memory_size
     if length(mask) != n
-        error("mask length must equal x0 length")
+        throw(ArgumentError("mask length must equal x0 length"))
     end
 
     l2 = lower === nothing ? fill(-Inf, n) : copy(lower)

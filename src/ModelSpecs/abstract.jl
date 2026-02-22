@@ -139,9 +139,9 @@ struct ModelCollection
 
     function ModelCollection(specs::Vector{<:AbstractModelSpec}, names::Vector{String})
         length(specs) == length(names) ||
-            error("Number of specs ($(length(specs))) must equal number of names ($(length(names)))")
+            throw(ArgumentError("Number of specs ($(length(specs))) must equal number of names ($(length(names)))"))
         length(specs) > 0 ||
-            error("ModelCollection must contain at least one model specification")
+            throw(ArgumentError("ModelCollection must contain at least one model specification"))
         new(specs, names)
     end
 end
@@ -184,7 +184,7 @@ struct FittedModelCollection
     function FittedModelCollection(models::Vector{<:AbstractFittedModel},
                                    names::Vector{String})
         length(models) == length(names) ||
-            error("Number of models must equal number of names")
+            throw(ArgumentError("Number of models must equal number of names"))
 
         # Extract metrics from each model
         metrics = Dict{String, Dict{Symbol, Float64}}()
@@ -213,10 +213,10 @@ struct ForecastModelCollection
                                      forecasts::Dict{String, Any},
                                      metadata::Dict{Symbol, Any} = Dict{Symbol, Any}())
         length(names) == length(forecasts) ||
-            error("Number of forecast names must match number of forecasts.")
+            throw(ArgumentError("Number of forecast names must match number of forecasts."))
         for name in names
             haskey(forecasts, name) ||
-                error("Forecasts dict missing entry for model '$name'.")
+                throw(ArgumentError("Forecasts dict missing entry for model '$name'."))
         end
         new(names, forecasts, metadata)
     end

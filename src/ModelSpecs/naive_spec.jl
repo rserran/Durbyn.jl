@@ -217,7 +217,7 @@ fc = forecast(fitted, h=12)
 """
 struct FittedNaive <: AbstractFittedModel
     spec::NaiveSpec
-    fit::Any
+    fit::NaiveFit
     target_col::Symbol
     data_schema::Dict{Symbol, Type}
     m::Int
@@ -263,7 +263,7 @@ fc = forecast(fitted, h=24)
 """
 struct FittedSnaive <: AbstractFittedModel
     spec::SnaiveSpec
-    fit::Any
+    fit::NaiveFit
     target_col::Symbol
     data_schema::Dict{Symbol, Type}
     m::Int
@@ -310,7 +310,7 @@ fc = forecast(fitted, h=12)
 """
 struct FittedRw <: AbstractFittedModel
     spec::RwSpec
-    fit::Any
+    fit::NaiveFit
     target_col::Symbol
     data_schema::Dict{Symbol, Type}
     m::Int
@@ -412,7 +412,7 @@ fc = forecast(fitted, h=12)
 """
 struct FittedMeanf <: AbstractFittedModel
     spec::MeanfSpec
-    fit::Any
+    fit::MeanFit
     target_col::Symbol
     data_schema::Dict{Symbol, Type}
     m::Int

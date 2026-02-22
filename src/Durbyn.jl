@@ -6,8 +6,6 @@ include("Optimize/Optimize.jl")
 include("Generics/Generics.jl")
 include("Stats/Stats.jl")
 include("Grammar/Grammar.jl")
-include("ModelSpecs/ModelSpecs.jl")
-include("TableOps/TableOps.jl")
 
 include("Models/Naive/Naive.jl")
 include("Models/ExponentialSmoothing/ExponentialSmoothing.jl")
@@ -18,6 +16,9 @@ include("Models/Bats/Bats.jl")
 include("Models/Tbats/Tbats.jl")
 include("Models/Theta/Theta.jl")
 include("Models/Diffusion/Diffusion.jl")
+
+include("ModelSpecs/ModelSpecs.jl")
+include("TableOps/TableOps.jl")
 
 
 using .Utils

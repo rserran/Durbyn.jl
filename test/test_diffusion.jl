@@ -564,7 +564,7 @@ using Durbyn
         y = [5.0, 15.0, 35.0, 65.0, 95.0, 105.0, 95.0, 70.0, 45.0, 25.0]
 
         for model_type in [Bass, Gompertz, GSGompertz, Weibull]
-            fit = fit_diffusion(y, model_type=model_type, initpar="preset")
+            fit = fit_diffusion(y, model_type=model_type, initpar=:preset)
             @test fit isa DiffusionFit
             @test fit.model_type == model_type
             @test fit.params.m > 0
@@ -612,7 +612,7 @@ using Durbyn
         y = [5.0, 15.0, 35.0, 65.0, 95.0, 105.0, 95.0, 70.0, 45.0, 25.0]
 
         # British spelling should be accepted
-        fit = fit_diffusion(y, model_type=Bass, initpar="linearise")
+        fit = fit_diffusion(y, model_type=Bass, initpar=:linearise)
         @test fit isa DiffusionFit
     end
 

@@ -1,5 +1,7 @@
 module Optimize
 
+import ..Utils: _check_arg
+
 include("numgrad.jl")
 include("nelder_mead.jl")
 include("bfgs.jl")

@@ -78,18 +78,18 @@ function _approxtest(x::Vector{Float64}, y::Vector{Float64}, method::Symbol, f::
 
     if na_rm
         @inbounds for i in eachindex(x,y)
-            (isnan(x[i]) || isnan(y[i])) && error("approx(): attempted to interpolate missing values")
+            (isnan(x[i]) || isnan(y[i])) && throw(ArgumentError("approx(): attempted to interpolate missing values"))
         end
     else
         @inbounds for i in eachindex(x)
-            isnan(x[i]) && error("approx(x,y, .., na.rm=false): missing values in x are not allowed")
+            isnan(x[i]) && throw(ArgumentError("approx(x,y, .., na.rm=false): missing values in x are not allowed"))
         end
     end
 
     length(x) == length(y) || throw(ArgumentError("approx(): length(x) and length(y) must match"))
-    length(x) > 0 || error("approx(): zero non-NA points")
+    length(x) > 0 || throw(ArgumentError("approx(): zero non-NA points"))
     if method === :linear
-        length(x) > 1 || error("approx(): need at least two non-NA values to interpolate")
+        length(x) > 1 || throw(ArgumentError("approx(): need at least two non-NA values to interpolate"))
     end
     return nothing
 end
@@ -130,19 +130,6 @@ end
     rule::Tuple = (1, 1),
     f::Real = 0.0,
     ties::Union{Function, Symbol} = mean,
-    na_rm::Bool = true,)
-
-    approx(;
-    x::AbstractVector,
-    y::AbstractVector,
-    xout::Union{AbstractVector,Nothing} = nothing,
-    method::String = "linear",
-    n::Integer = 50,
-    yleft::Union{Float64,Nothing} = nothing,
-    yright::Union{Float64,Nothing} = nothing,
-    rule::Tuple = (1, 1),
-    f::Real = 0.0,
-    ties::Union{Function,String} = mean,
     na_rm::Bool = true,)
 
 Interpolation Functions
@@ -249,7 +236,7 @@ function approx(x::AbstractVector, y::AbstractVector;
 
     noNA = na_rm || !r.keptNA
     nx = noNA ? length(x) : sum(r.notNA)
-    isnan(float(nx)) && error("invalid length(x)")
+    isnan(float(nx)) && throw(ArgumentError("invalid length(x)"))
 
     if isnothing(yleft)
         yleft = (rule_t[1] == 1) ? NaN : float(y[1])
@@ -267,7 +254,7 @@ function approx(x::AbstractVector, y::AbstractVector;
     _approxtest(xv, yv, method, f; na_rm=na_rm)
 
     if isnothing(xout)
-        n > 0 || error("approx requires n >= 1")
+        n > 0 || throw(ArgumentError("approx requires n >= 1"))
         if noNA
             xout = range(xv[1], xv[end], length=n)
         else
@@ -285,39 +272,6 @@ function approx(x::AbstractVector, y::AbstractVector;
     return (x = xoutv, y = yout)
 end
 
-function approx(;
-    x::AbstractVector,
-    y::AbstractVector,
-    xout::Union{AbstractVector,Nothing} = nothing,
-    method::String = "linear",
-    n::Integer = 50,
-    yleft::Union{Float64,Nothing} = nothing,
-    yright::Union{Float64,Nothing} = nothing,
-    rule::Tuple = (1, 1),
-    f::Real = 0.0,
-    ties::Union{Function,String} = mean,
-    na_rm::Bool = true,)
-    method = Symbol(method)
-
-    if ties isa String
-        ties = Symbol(ties)
-    end
-
-    out = approx(
-        x,
-        y,
-        xout = xout,
-        method = method,
-        n = n,
-        yleft = yleft,
-        yright = yright,
-        rule = rule,
-        f = f,
-        ties = ties,
-        na_rm = na_rm,
-    )
-    return out
-end
 
 """
 
@@ -331,17 +285,6 @@ end
     f::Real = 0.0,
     ties::Union{Function, Symbol} = mean,
     na_rm::Bool = true,)k
-
-    approxfun(
-    ;x::AbstractVector,
-    y::AbstractVector,
-    method::String = "linear",
-    yleft::Union{Float64, Nothing} = nothing,
-    yright::Union{Float64, Nothing} = nothing,
-    rule::Tuple = (1, 1),
-    f::Real = 0.0,
-    ties::Union{Function, String} = mean,
-    na_rm::Bool = true,)
 
 Return a function performing linear or constant interpolation of the given data points.
 
@@ -426,7 +369,7 @@ function approxfun(x::AbstractVector, y::AbstractVector;
     x = r.x; y = r.y
 
     nx = (na_rm || !r.keptNA) ? length(x) : sum(r.notNA)
-    isnan(float(nx)) && error("invalid length(x)")
+    isnan(float(nx)) && throw(ArgumentError("invalid length(x)"))
 
     if isnothing(yleft)
         yleft = (rule_t[1] == 1) ? NaN : float(y[1])
@@ -458,31 +401,3 @@ function approxfun(x::AbstractVector, y::AbstractVector;
     end
 end
 
-function approxfun(
-    ;x::AbstractVector,
-    y::AbstractVector,
-    method::String = "linear",
-    yleft::Union{Float64, Nothing} = nothing,
-    yright::Union{Float64, Nothing} = nothing,
-    rule::Tuple = (1, 1),
-    f::Real = 0.0,
-    ties::Union{Function, String} = mean,
-    na_rm::Bool = true,)
-
-    method = Symbol(method)
-
-    if ties isa String
-        ties = Symbol(ties)
-    end
-
-    approxfun(
-    x,
-    y,
-    method = method,
-    yleft = yleft,
-    yright = yright,
-    rule = rule,
-    f = f,
-    ties = ties,
-    na_rm = na_rm,)
-end

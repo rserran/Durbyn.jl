@@ -50,8 +50,8 @@ and short-term dynamics, then combines their forecasts.
 
 **Seasonal decomposition**:
 ```julia
-@formula(sales = theta(decomposition="multiplicative"))
-@formula(sales = theta(decomposition="additive"))
+@formula(sales = theta(decomposition=:multiplicative))
+@formula(sales = theta(decomposition=:additive))
 ```
 
 **Multi-step MSE**:
@@ -71,10 +71,10 @@ spec = ThetaSpec(@formula(sales = theta(model=:OTM)))
 spec = ThetaSpec(@formula(sales = theta(model=:OTM, alpha=0.2)))
 
 # Theta with seasonal decomposition
-spec = ThetaSpec(@formula(sales = theta(decomposition="additive")))
+spec = ThetaSpec(@formula(sales = theta(decomposition=:additive)))
 
 # Full specification
-spec = ThetaSpec(@formula(sales = theta(model=:DOTM, decomposition="multiplicative", nmse=5)))
+spec = ThetaSpec(@formula(sales = theta(model=:DOTM, decomposition=:multiplicative, nmse=5)))
 
 # Fit to data
 fitted = fit(spec, data, m=12)
@@ -124,7 +124,7 @@ fitted.fit.mse               # Mean squared error
 fitted.fit.fitted            # Fitted values
 fitted.fit.residuals         # In-sample residuals
 fitted.fit.decompose         # Whether seasonal decomposition was applied
-fitted.fit.decomposition_type  # "multiplicative", "additive", or "none"
+fitted.fit.decomposition_type  # :multiplicative, :additive, or :none
 
 # Generate forecasts
 fc = forecast(fitted, h=12)
@@ -133,7 +133,7 @@ fc = forecast(fitted, h=12)
 """
 struct FittedTheta <: AbstractFittedModel
     spec::ThetaSpec
-    fit::Any
+    fit::ThetaFit
     target_col::Symbol
     data_schema::Dict{Symbol, Type}
     m::Int

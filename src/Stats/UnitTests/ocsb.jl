@@ -104,11 +104,11 @@ end
 @inline v_at(x, t)    = x[t] - x[t-1]
 
 function fit_ocsb(x::AbstractVector{<:Real}, lag::Int, maxlag::Int, m::Int)
-    @assert lag ≥ 0 && maxlag ≥ 0 && m ≥ 1
+    (lag ≥ 0 && maxlag ≥ 0 && m ≥ 1) || throw(ArgumentError("lag and maxlag must be non-negative; m must be ≥ 1"))
     n = length(x)
 
     t0 = m + 2 + max(maxlag, lag)
-    @assert n ≥ t0 "not enough observations for m=$(m), lag=$(lag), maxlag=$(maxlag)"
+    n ≥ t0 || throw(ArgumentError("not enough observations for m=$(m), lag=$(lag), maxlag=$(maxlag)"))
     T  = t0:n
     L  = length(T)
 
@@ -184,9 +184,6 @@ end
 """
 ocsb(x::AbstractVector{<:Real}, m::Int; lag_method::Symbol = :fixed,
         maxlag::Int = 0, clevels::AbstractVector{<:Real} = [0.10, 0.05, 0.01])
-
-ocsb(; x::AbstractVector{<:Real}, m::Int, lag_method::String = "fixed",
-        maxlag::Int = 0, clevels::AbstractVector{<:Real} = [0.10, 0.05, 0.01],)
 
 Osborn-Chui-Smith-Birchenhall (OCSB) test for seasonal unit roots.
 
@@ -268,10 +265,10 @@ function ocsb(
     maxlag::Int = 0,
     clevels::AbstractVector{<:Real} = [0.10, 0.05, 0.01],
 )
-    @assert m ≥ 2 "Data must be seasonal (m ≥ 2) to use ocsb."
+    m ≥ 2 || throw(ArgumentError("Data must be seasonal (m ≥ 2) to use ocsb."))
 
     lmeth = Symbol(lowercase(string(lag_method)))
-    @assert lmeth in (:fixed, :aic, :bic, :aicc) "lag_method must be one of: :fixed, :AIC, :BIC, :AICc."
+    lmeth in (:fixed, :aic, :bic, :aicc) || throw(ArgumentError("lag_method must be one of: :fixed, :aic, :bic, :aicc."))
 
     chosen_lag = maxlag
     if maxlag > 0 && lmeth != :fixed
@@ -291,7 +288,7 @@ function ocsb(
     reg = fit_ocsb(x, chosen_lag, chosen_lag, m)
 
     tstats = reg.coef ./ reg.se
-    @assert length(tstats) ≥ 2 "Final regression must include Z4 and Z5 regressors."
+    length(tstats) ≥ 2 || throw(ArgumentError("Final regression must include Z4 and Z5 regressors."))
     teststat = tstats[end]
     residuals = reg.residuals
 
@@ -307,15 +304,3 @@ function ocsb(
     )
 end
 
-function ocsb(;
-    x::AbstractVector{<:Real},
-    m::Int,
-    lag_method::String = "fixed",
-    maxlag::Int = 0,
-    clevels::AbstractVector{<:Real} = [0.10, 0.05, 0.01],
-)
-
-    lag_method = match_arg(lag_method, ["fixed", "aic", "bic", "aicc"])
-    lag_method = Symbol(lag_method)
-    return ocsb(x, m, lag_method = lag_method, maxlag = maxlag, clevels = clevels)
-end

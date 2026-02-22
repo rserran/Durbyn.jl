@@ -46,7 +46,7 @@ function bcloglik(x::AbstractArray, m::Int; lower::Float64 = -1.0, upper::Float6
     xc = Vector{Float64}([Float64(x[i]) for i in 1:n_orig if good[i]])
 
     if any(xc .<= 0)
-        error("x must be positive")
+        throw(DomainError(x, "Box-Cox transformation requires positive values"))
     end
 
     logx = log.(xc)
@@ -91,26 +91,26 @@ function bcloglik(x::AbstractArray, m::Int; lower::Float64 = -1.0, upper::Float6
 end
 
 """
-    box_cox_lambda(x::AbstractVector, m::Int; method::String = "guerrero", lower::Real = -1, upper::Real = 2)
+    box_cox_lambda(x::AbstractVector, m::Int; method::Symbol = :guerrero, lower::Real = -1, upper::Real = 2)
 
 Automatic selection of Box-Cox transformation parameter.
 
 # Description
-If `method == "guerrero"`, Guerrero's (1993) method is used, 
+If `method === :guerrero`, Guerrero's (1993) method is used,
 where λ minimizes the coefficient of variation for subseries of `x`.
 
 # Arguments
 - `x::AbstractVector{<:Number}`: A numeric vector or time series.
 - `m::Int`: The frequency of the data.
-- `method::String`: Choose the method to be used in calculating λ. Options are `"guerrero"` or `"loglik"`.
+- `method::Symbol`: Choose the method to be used in calculating λ. Options are `:guerrero` or `:loglik`.
 - `lower::Float64`: Lower limit for possible λ values.
 - `upper::Float64`: Upper limit for possible λ values.
 - `nonseasonal_length::Int` Lenght of non-seasonal componants. Do not need to change.
 - `is_ts::Bool` Is data time series?
 
 # Details
-If `method == "loglik"`, the value of λ is chosen to maximize the profile 
-log likelihood of a linear model fitted to `x`. For non-seasonal data, 
+If `method === :loglik`, the value of λ is chosen to maximize the profile
+log likelihood of a linear model fitted to `x`. For non-seasonal data,
 a linear time trend is fitted while for seasonal data, a linear
      time trend with seasonal dummy variables is used.
 
@@ -125,7 +125,7 @@ transformations. Journal of Forecasting, 12, 37–48.
 """
 
 function box_cox_lambda(x::AbstractVector{<:Number}, m::Int;
-    method::String="guerrero", lower::Float64=-1.0, upper::Float64=2.0,
+    method::Symbol=:guerrero, lower::Float64=-1.0, upper::Float64=2.0,
     nonseasonal_length::Int=2, is_ts::Bool=true)
     if any(v -> !ismissing(v) && !(v isa AbstractFloat && isnan(v)) && v <= 0, x)
         lower = max(lower, 0.0)
@@ -135,24 +135,24 @@ function box_cox_lambda(x::AbstractVector{<:Number}, m::Int;
         return 1.0
     end
 
-    if method == "loglik"
+    if method === :loglik
         return bcloglik(x, m, lower=lower, upper=upper, is_ts=is_ts)
-    elseif method == "guerrero"
+    elseif method === :guerrero
         return guerrero(x, m, lower, upper, nonseasonal_length)
     else
-        error("Unknown method: $method. Choose either 'loglik' or 'guerrero'.")
+        throw(ArgumentError("Unknown method: $method. Choose either :loglik or :guerrero."))
     end
 end
 
 """
-    box_cox(x::AbstractVector{<:Number}, m::Int; lambda::Union{String, Number}="auto")
+    box_cox(x::AbstractVector{<:Number}, m::Int; lambda::Union{Symbol, Number}=:auto)
 
 box_cox returns a transformation of the input variable using a Box-Cox transformation.
 
 # Arguments
 - `x::AbstractVector`: A numeric vector or time series.
-- `lambda::Union{String, Number}`: Transformation parameter. 
-If `"auto"`, then the transformation parameter λ is chosen using `box_cox_lambda` 
+- `lambda::Union{Symbol, Number}`: Transformation parameter.
+If `:auto`, then the transformation parameter λ is chosen using `box_cox_lambda`
 with a lower bound of -0.9.
 
 # Details
@@ -160,9 +160,9 @@ The Box-Cox transformation as given by Bickel & Doksum 1981.
 # Returns
 A numeric vector of the same length as `x`.
 """
-function box_cox(x::AbstractVector{<:Number}, m::Int; lambda::Union{String,Number}="auto")
+function box_cox(x::AbstractVector{<:Number}, m::Int; lambda::Union{Symbol,Number}=:auto)
     x = copy(x)
-    if lambda == "auto"
+    if lambda === :auto
         lambda = box_cox_lambda(x, m, lower=-0.9)
     end
     if lambda < 0
@@ -188,7 +188,7 @@ Identical mathematical behavior but eliminates intermediate allocations.
 - `output::AbstractVector`: Pre-allocated output buffer
 - `x::AbstractVector`: Input vector
 - `m::Int`: Frequency parameter (kept for API consistency)
-- `lambda::Real`: Transformation parameter (must be numeric, not "auto")
+- `lambda::Real`: Transformation parameter (must be numeric, not `:auto`)
 
 # Returns
 Tuple of (output, lambda) where output contains the transformed values.
@@ -273,7 +273,7 @@ function inv_box_cox(x::AbstractArray; lambda::Real, biasadj::Union{Bool,Nothing
 
     if biasadj
         fvar_local = fvar
-        isnothing(fvar_local) && error("fvar must be provided when biasadj=true")
+        isnothing(fvar_local) && throw(ArgumentError("fvar must be provided when biasadj=true"))
 
         if (fvar_local isa Dict) || (fvar_local isa NamedTuple)
             level = maximum(fvar_local[:level])
@@ -283,7 +283,7 @@ function inv_box_cox(x::AbstractArray; lambda::Real, biasadj::Union{Bool,Nothing
             if ndims(upper) == 2 && ndims(lower) == 2 && size(upper,2) > 1 && size(lower,2) > 1
                 lvlvec = fvar_local[:level]
                 idx = findfirst(==(level), lvlvec)
-                isnothing(idx) && error("Requested level $level not found in fvar[:level]")
+                isnothing(idx) && throw(ArgumentError("Requested level $level not found in fvar[:level]"))
                 upper = upper[:, idx]
                 lower = lower[:, idx]
             end
@@ -307,7 +307,7 @@ function inv_box_cox(x::AbstractArray; lambda::Real, biasadj::Union{Bool,Nothing
             L = length(fvar_local)
             N = length(out)
             if L == 0
-                error("fvar vector is empty")
+                throw(ArgumentError("fvar vector is empty"))
             end
             reps = cld(N, L)
             flat = repeat(fvar_local, reps)[1:N]

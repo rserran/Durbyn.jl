@@ -30,7 +30,7 @@ mutable struct TBATSModel
     x::Matrix{Float64}
     seed_states::AbstractArray{Float64}
     variance::Float64
-    AIC::Float64
+    aic::Union{Float64,Nothing}
     likelihood::Float64
     optim_return_code::Int
     y::Vector{Float64}
@@ -38,6 +38,9 @@ mutable struct TBATSModel
     method::String
     biasadj::Bool
 end
+
+_aic_val(model::Nothing) = Inf
+_aic_val(model) = isnothing(model.aic) ? Inf : model.aic
 
 function tbats_descriptor(
     lambda::Union{Float64,Nothing},
@@ -608,7 +611,7 @@ function calc_model_tbats(
 end
 
 
-function fitSpecificTBATS(
+function fit_specific_tbats(
     y::AbstractVector{<:Real};
     use_box_cox::Bool,
     use_beta::Bool,
@@ -799,7 +802,7 @@ function fitSpecificTBATS(
         opt_result = optimize(
             scaled_param0,
             objective_scaled;
-            method = "Nelder-Mead",
+            method = :nelder_mead,
             control = Dict("maxit" => maxit),
         )
 
@@ -860,14 +863,14 @@ function fitSpecificTBATS(
             opt_result = optimize(
                 scaled_param0,
                 objective_scaled;
-                method = "Nelder-Mead",
+                method = :nelder_mead,
                 control = Dict("maxit" => maxit),
             )
         else
             opt_result = optimize(
                 scaled_param0,
                 objective_scaled;
-                method = "BFGS",
+                method = :bfgs,
             )
         end
 
@@ -918,7 +921,7 @@ function fitSpecificTBATS(
         likelihood = likelihood,
         optim_return_code = opt_result.convergence,
         variance = variance,
-        AIC = aic,
+        aic = aic,
         parameters = (vect = opt_par, control = control),
         seed_states = x_nought,
         fitted_values = collect(fitted_values),
@@ -1128,7 +1131,7 @@ function calc_likelihood_tbats_notransform(
 end
 
 
-function filterTBATSSpecifics(
+function filter_tbats_specifics(
     y::AbstractVector{<:Real},
     box_cox::Bool,
     trend::Bool,
@@ -1146,7 +1149,7 @@ function filterTBATSSpecifics(
 
     first_model = if aux_model === nothing
         try
-            fitSpecificTBATS(
+            fit_specific_tbats(
                 Float64.(y);
                 use_box_cox = box_cox,
                 use_beta = trend,
@@ -1159,7 +1162,7 @@ function filterTBATSSpecifics(
                 biasadj = biasadj,
             )
         catch e
-            @warn "fitSpecificTBATS in filterTBATSSpecifics failed: $e"
+            @warn "fit_specific_tbats in filter_tbats_specifics failed: $e"
             nothing
         end
     else
@@ -1177,7 +1180,7 @@ function filterTBATSSpecifics(
     arma = try
         auto_arima(collect(Float64, first_model.errors), 1; d = 0, arima_kwargs...)
     catch e
-        @warn "auto_arima in filterTBATSSpecifics failed: $e"
+        @warn "auto_arima in filter_tbats_specifics failed: $e"
         nothing
     end
 
@@ -1198,7 +1201,7 @@ function filterTBATSSpecifics(
     starting_params = first_model.parameters
 
     second_model = try
-        fitSpecificTBATS(
+        fit_specific_tbats(
             Float64.(y);
             use_box_cox = box_cox,
             use_beta = trend,
@@ -1214,12 +1217,12 @@ function filterTBATSSpecifics(
             biasadj = biasadj,
         )
     catch e
-        @warn "fitSpecificTBATS with ARMA in filterTBATSSpecifics failed: $e"
+        @warn "fit_specific_tbats with ARMA in filter_tbats_specifics failed: $e"
         nothing
     end
 
-    aic_first = first_model.AIC
-    aic_second = second_model === nothing ? Inf : second_model.AIC
+    aic_first = _aic_val(first_model)
+    aic_second = _aic_val(second_model)
 
     if aic_second < aic_first
         return second_model
@@ -1228,7 +1231,7 @@ function filterTBATSSpecifics(
     end
 end
 
-function fitPreviousTBATSModel(y::Vector{Float64}; model::TBATSModel)
+function fit_previous_tbats_model(y::Vector{Float64}; model::TBATSModel)
     # Handle constant model edge case
     if isempty(model.parameters)
         return create_constant_tbats_model(y)
@@ -1353,7 +1356,7 @@ function tbats(
 )
 
     if ndims(y) != 1
-        error("y should be a univariate time series (1D vector)")
+        throw(ArgumentError("y should be a univariate time series (1D vector)"))
     end
 
     orig_y = copy(y)
@@ -1382,14 +1385,14 @@ function tbats(
 
     if model !== nothing
         if model isa TBATSModel
-            result = fitPreviousTBATSModel(collect(Float64, y); model = model)
+            result = fit_previous_tbats_model(collect(Float64, y); model = model)
             result.y = collect(Float64, orig_y)
             result.method = tbats_descriptor(result)
             return result
         elseif model isa BATSModel
             return bats(orig_y; model = model)
         else
-            error("Unsupported model type for refit in tbats")
+            throw(ArgumentError("Unsupported model type for refit in tbats"))
         end
     end
 
@@ -1411,7 +1414,7 @@ function tbats(
         x === nothing ? Bool[false, true] :
         x isa Bool ? Bool[x] :
         x isa AbstractVector{Bool} ? collect(x) :
-        error("use_* arguments must be Bool, Vector{Bool}, or nothing")
+        throw(ArgumentError("use_* arguments must be Bool, Vector{Bool}, or nothing"))
 
     box_cox_values = normalize_bool_vector(use_box_cox)
     if any(box_cox_values)
@@ -1483,7 +1486,7 @@ function tbats(
         k_vector = ones(Int, length(seasonal_periods))
     end
 
-    function safe_fitSpecificTBATS(
+    function safe_fit_specific_tbats(
         y_num;
         use_box_cox::Bool,
         use_beta::Bool,
@@ -1496,7 +1499,7 @@ function tbats(
         biasadj,
     )
         try
-            return fitSpecificTBATS(
+            return fit_specific_tbats(
                 y_num;
                 use_box_cox = use_box_cox,
                 use_beta = use_beta,
@@ -1509,12 +1512,12 @@ function tbats(
                 biasadj = biasadj,
             )
         catch e
-            @warn "fitSpecificTBATS failed: $e"
+            @warn "fit_specific_tbats failed: $e"
             return nothing
         end
     end
 
-    best_model = safe_fitSpecificTBATS(
+    best_model = safe_fit_specific_tbats(
         y_num;
         use_box_cox = model_params[1],
         use_beta = model_params[2],
@@ -1527,7 +1530,7 @@ function tbats(
         biasadj = biasadj,
     )
 
-    best_aic = best_model === nothing ? Inf : getfield(best_model, :AIC)
+    best_aic = _aic_val(best_model)
 
     if user_k !== nothing
         # User provided k — skip k-search, go straight to model selection
@@ -1568,7 +1571,7 @@ function tbats(
             local_best_aic = Inf
 
             while true
-                new_model = safe_fitSpecificTBATS(
+                new_model = safe_fit_specific_tbats(
                     y_num;
                     use_box_cox = model_params[1],
                     use_beta = model_params[2],
@@ -1581,7 +1584,7 @@ function tbats(
                     biasadj = biasadj,
                 )
 
-                new_aic = new_model === nothing ? Inf : getfield(new_model, :AIC)
+                new_aic = _aic_val(new_model)
 
                 if new_aic > local_best_aic
                     k_vector[i] += 1
@@ -1611,7 +1614,7 @@ function tbats(
             step_down_k[i] = 5
             k_vector[i] = 6
 
-            up_model = safe_fitSpecificTBATS(
+            up_model = safe_fit_specific_tbats(
                 y_num;
                 use_box_cox = model_params[1],
                 use_beta = model_params[2],
@@ -1623,7 +1626,7 @@ function tbats(
                 bc_upper = bc_upper,
                 biasadj = biasadj,
             )
-            level_model = safe_fitSpecificTBATS(
+            level_model = safe_fit_specific_tbats(
                 y_num;
                 use_box_cox = model_params[1],
                 use_beta = model_params[2],
@@ -1635,7 +1638,7 @@ function tbats(
                 bc_upper = bc_upper,
                 biasadj = biasadj,
             )
-            down_model = safe_fitSpecificTBATS(
+            down_model = safe_fit_specific_tbats(
                 y_num;
                 use_box_cox = model_params[1],
                 use_beta = model_params[2],
@@ -1648,9 +1651,9 @@ function tbats(
                 biasadj = biasadj,
             )
 
-            a_up = up_model === nothing ? Inf : getfield(up_model, :AIC)
-            a_level = level_model === nothing ? Inf : getfield(level_model, :AIC)
-            a_down = down_model === nothing ? Inf : getfield(down_model, :AIC)
+            a_up = _aic_val(up_model)
+            a_level = _aic_val(level_model)
+            a_down = _aic_val(down_model)
 
             if a_down <= a_up && a_down <= a_level
                 best_local = down_model
@@ -1659,7 +1662,7 @@ function tbats(
 
                 while true
                     k_vector[i] -= 1
-                    new_model = safe_fitSpecificTBATS(
+                    new_model = safe_fit_specific_tbats(
                         y_num;
                         use_box_cox = model_params[1],
                         use_beta = model_params[2],
@@ -1671,7 +1674,7 @@ function tbats(
                         bc_upper = bc_upper,
                         biasadj = biasadj,
                     )
-                    new_aic = new_model === nothing ? Inf : getfield(new_model, :AIC)
+                    new_aic = _aic_val(new_model)
 
                     if new_aic > best_local_aic
                         k_vector[i] += 1
@@ -1703,7 +1706,7 @@ function tbats(
 
                 while true
                     k_vector[i] += 1
-                    new_model = safe_fitSpecificTBATS(
+                    new_model = safe_fit_specific_tbats(
                         y_num;
                         use_box_cox = model_params[1],
                         use_beta = model_params[2],
@@ -1715,7 +1718,7 @@ function tbats(
                         bc_upper = bc_upper,
                         biasadj = biasadj,
                     )
-                    new_aic = new_model === nothing ? Inf : getfield(new_model, :AIC)
+                    new_aic = _aic_val(new_model)
 
                     if new_aic > best_local_aic
                         k_vector[i] -= 1
@@ -1741,7 +1744,7 @@ function tbats(
 
     aux_model = best_model
 
-    if nonseasonal_model.AIC < (best_model === nothing ? Inf : best_model.AIC)
+    if _aic_val(nonseasonal_model) < _aic_val(best_model)
         best_model = nonseasonal_model
     end
 
@@ -1753,7 +1756,7 @@ function tbats(
                 end
 
                 if model_params == Bool[box_cox, trend, damping]
-                    new_model = filterTBATSSpecifics(
+                    new_model = filter_tbats_specifics(
                         y_num,
                         box_cox,
                         trend,
@@ -1769,7 +1772,7 @@ function tbats(
                         kwargs...,
                     )
                 elseif trend || !damping
-                    new_model = filterTBATSSpecifics(
+                    new_model = filter_tbats_specifics(
                         y_num,
                         box_cox,
                         trend,
@@ -1791,7 +1794,7 @@ function tbats(
                     continue
                 end
 
-                if best_model === nothing || new_model.AIC < best_model.AIC
+                if best_model === nothing || _aic_val(new_model) < _aic_val(best_model)
                     best_model = new_model
                 end
             end
@@ -1836,7 +1839,7 @@ function tbats(
         best_model.x,
         best_model.seed_states,
         best_model.variance,
-        best_model.AIC,
+        best_model.aic,
         best_model.likelihood,
         best_model.optim_return_code,
         orig_y,
@@ -1907,7 +1910,7 @@ function create_constant_tbats_model(y::Vector{Float64})
         fill(y_mean, 1, n),
         [y_mean],
         0.0,
-        -Inf,
+        nothing,
         -Inf,
         0,
         y,
@@ -2125,5 +2128,7 @@ function Base.show(io::IO, model::TBATSModel)
 
     println(io, "")
     println(io, "Sigma:   ", round(sqrt(model.variance), digits = 4))
-    println(io, "AIC:     ", round(model.AIC, digits = 2))
+    if !isnothing(model.aic)
+        println(io, "AIC:     ", round(model.aic, digits = 2))
+    end
 end

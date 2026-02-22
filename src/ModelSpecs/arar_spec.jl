@@ -96,7 +96,7 @@ fc = forecast(fitted, h = 12)
 """
 struct FittedArar <: AbstractFittedModel
     spec::ArarSpec
-    fit::Any
+    fit::ARAR
     target_col::Symbol
     data_schema::Dict{Symbol, Type}
 

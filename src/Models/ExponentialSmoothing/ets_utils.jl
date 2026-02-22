@@ -13,7 +13,7 @@ ETS model output
 - `par::Dict{String, Any}`: A dictionary containing the parameters of the ETS model, where the keys are parameter names and the values are the parameter values.
 - `initstate::DataFrame`: A DataFrame containing the initial state estimates of the model.
 - `states::DataFrame`: A DataFrame containing the state estimates of the model over time.
-- `SSE::Float64`: The sum of squared errors (SSE) of the model, a measure of the model's fit to the data.
+- `sse::Float64`: The sum of squared errors (SSE) of the model, a measure of the model's fit to the data.
 - `sigma2::Float64`: The variance of the residuals, indicating the spread of the residuals around zero.
 - `m::Int`: The frequency of the seasonal component, e.g., 12 for monthly data with yearly seasonality.
 - `lambda::Float64`: The Box-Cox transformation parameter, used if the data were transformed before fitting the model.
@@ -32,24 +32,24 @@ ETS model output
 struct EtsModel <: ETS
     fitted::AbstractArray
     residuals::AbstractArray
-    components::Vector{Any}
+    components::Vector{String}
     x::AbstractArray
-    par::Any
-    loglik::Union{Float64,Int}
+    par::Dict{String,Any}
+    loglik::Float64
     initstate::AbstractArray
     states::AbstractArray
-    state_names::Any
-    SSE::Union{Float64,Int}
-    sigma2::Union{Float64,Int}
+    state_names::Vector{String}
+    sse::Float64
+    sigma2::Float64
     m::Int
     lambda::Union{Float64,Bool,Nothing}
     biasadj::Bool
-    aic::Union{Float64,Int}
-    bic::Union{Float64,Int}
-    aicc::Union{Float64,Int}
-    mse::Union{Float64,Int}
-    amse::Union{Float64,Int}
-    fit::Any
+    aic::Float64
+    bic::Float64
+    aicc::Float64
+    mse::Float64
+    amse::Float64
+    fit::Union{Dict{String,Any}, Nothing}
     method::String
 end
 
@@ -62,7 +62,7 @@ struct EtsRefit
 end
 
 struct SimpleHoltWinters <: ETS
-    SSE::Float64
+    sse::Float64
     fitted::Vector{Float64}
     residuals::Vector{Float64}
     level::Vector{Float64}
@@ -74,13 +74,13 @@ end
 struct HoltWintersConventional <: ETS
     fitted::AbstractArray
     residuals::AbstractArray
-    components::Any
+    components::Vector{String}
     x::AbstractArray
     par::Dict{String,Any}
     initstate::AbstractArray
     states::AbstractArray
     state_names::Vector{String}
-    SSE::Float64
+    sse::Float64
     sigma2::Float64
     m::Int
     lambda::Union{Nothing,Float64}
@@ -143,13 +143,13 @@ const OPT_CRIT_AMSE = 2
 const OPT_CRIT_SIGMA = 3
 const OPT_CRIT_MAE = 4
 
-@inline function opt_crit_code(s::AbstractString)
-    s == "lik" && return OPT_CRIT_LIK
-    s == "mse" && return OPT_CRIT_MSE
-    s == "amse" && return OPT_CRIT_AMSE
-    s == "sigma" && return OPT_CRIT_SIGMA
-    s == "mae" && return OPT_CRIT_MAE
-    throw(ArgumentError("Unknown optimization criterion: $s"))
+@inline function opt_crit_code(s::Symbol)
+    s === :lik && return OPT_CRIT_LIK
+    s === :mse && return OPT_CRIT_MSE
+    s === :amse && return OPT_CRIT_AMSE
+    s === :sigma && return OPT_CRIT_SIGMA
+    s === :mae && return OPT_CRIT_MAE
+    throw(ArgumentError("Unknown optimization criterion: :$s"))
 end
 
 # Integer codes for bounds
@@ -157,11 +157,11 @@ const BOUNDS_BOTH = 0
 const BOUNDS_USUAL = 1
 const BOUNDS_ADMISSIBLE = 2
 
-@inline function bounds_code(s::AbstractString)
-    s == "both" && return BOUNDS_BOTH
-    s == "usual" && return BOUNDS_USUAL
-    s == "admissible" && return BOUNDS_ADMISSIBLE
-    throw(ArgumentError("Unknown bounds type: $s"))
+@inline function bounds_code(s::Symbol)
+    s === :both && return BOUNDS_BOTH
+    s === :usual && return BOUNDS_USUAL
+    s === :admissible && return BOUNDS_ADMISSIBLE
+    throw(ArgumentError("Unknown bounds type: :$s"))
 end
 
 function normalize_parameter(param)
@@ -600,11 +600,11 @@ function initparam(
     lower::Vector{Float64},
     upper::Vector{Float64},
     m::Int,
-    bounds::String;
+    bounds::Symbol;
     nothing_as_nan::Bool = false,)
 
 
-    if bounds == "admissible"
+    if bounds === :admissible
         lower[1] = 0.0; lower[2] = 0.0; lower[3] = 0.0
         upper[1] = 1e-3; upper[2] = 1e-3; upper[3] = 1e-3
     elseif any(lower .> upper)
@@ -752,7 +752,7 @@ function check_param(
     phi::Union{Float64,Nothing,Bool},
     lower::Vector{Float64},
     upper::Vector{Float64},
-    bounds::String,
+    bounds::Symbol,
     m::Int,
 )
 
@@ -761,7 +761,7 @@ function check_param(
     gamma = normalize_parameter(gamma)
     phi = normalize_parameter(phi)
 
-    if bounds != "admissible"
+    if bounds !== :admissible
         if !isnothing(alpha) && !isnan(alpha)
             if alpha < lower[1] || alpha > upper[1]
                 return false
@@ -784,7 +784,7 @@ function check_param(
         end
     end
 
-    if bounds != "usual"
+    if bounds !== :usual
         if !admissible(alpha, beta, gamma, phi, m)
             return false
         end
@@ -863,7 +863,7 @@ function handle_seasonality(y::AbstractVector, m::Integer, seasontype::String)
         decomp = decompose(
             x = y,
             m = m,
-            type = seasontype == "A" ? "additive" : "multiplicative",
+            type = seasontype == "A" ? :additive : :multiplicative,
         )
         return Dict(:seasonal => decomp.seasonal)
     end
@@ -1123,7 +1123,7 @@ function simple_holt_winters(
     beta::Union{Nothing,Float64,Bool} = nothing,
     gamma::Union{Nothing,Float64,Bool} = nothing,
     phi::Union{Nothing,Float64,Bool} = nothing,
-    seasonal::String = "additive",
+    seasonal::Symbol = :additive,
     m::Int,
     dotrend::Bool = false,
     doseasonal::Bool = false,
@@ -1147,7 +1147,7 @@ function simple_holt_winters(
     season = zeros(Float64, lenx)
     xfit = zeros(Float64, lenx)
     residuals = zeros(Float64, lenx)
-    SSE = 0.0
+    sse_val = 0.0
 
     if !dotrend
         beta = 0.0
@@ -1156,7 +1156,7 @@ function simple_holt_winters(
 
     if !doseasonal
         gamma = 0.0
-        s_start .= ifelse(seasonal == "additive", 0, 1)
+        s_start .= ifelse(seasonal === :additive, 0, 1)
     end
 
     lastlevel = copy(l_start)
@@ -1185,10 +1185,10 @@ function simple_holt_winters(
         end
 
         if isnothing(lastseason)
-            lastseason = ifelse(seasonal == "additive", 0, 1)
+            lastseason = ifelse(seasonal === :additive, 0, 1)
         end
 
-        if seasonal == "additive"
+        if seasonal === :additive
             if !exponential
                 xhat = lastlevel .+ phi .* lasttrend .+ lastseason
             else
@@ -1207,9 +1207,9 @@ function simple_holt_winters(
         xfit[i] = xhat[1]
         res = x[i] - xhat[1]
         residuals[i] = res
-        SSE += res^2
+        sse_val += res^2
 
-        if seasonal == "additive"
+        if seasonal === :additive
             if !exponential
                 level[i] =
                     (alpha*(x[i]-lastseason).+(1-alpha)*(lastlevel.+phi*lasttrend))[1]
@@ -1233,7 +1233,7 @@ function simple_holt_winters(
             trend[i] = (beta.*(level[i]./lastlevel).+(1-beta).*lasttrend .^ phi)[1]
         end
 
-        if seasonal == "additive"
+        if seasonal === :additive
             if !exponential
                 season[i] =
                     (gamma*(x[i].-lastlevel.-phi*lasttrend).+(1-gamma)*lastseason)[1]
@@ -1253,7 +1253,7 @@ function simple_holt_winters(
     end
 
     return SimpleHoltWinters(
-        SSE,
+        sse_val,
         xfit,
         residuals,
         [level0; level],
@@ -1271,7 +1271,7 @@ function calculate_opt_sse(
     alpha::Union{Nothing,Float64,Bool},
     beta::Union{Nothing,Float64,Bool},
     gamma::Union{Nothing,Float64,Bool},
-    seasonal::String,
+    seasonal::Symbol,
     m::Int,
     exponential::Union{Nothing,Bool},
     phi::Union{Nothing,Float64},
@@ -1310,7 +1310,7 @@ function calculate_opt_sse(
         s_start = s_start,
     )
 
-    return out.SSE
+    return out.sse
 end
 
 function holt_winters_conventional(
@@ -1320,17 +1320,17 @@ function holt_winters_conventional(
     beta::Union{Nothing,Float64,Bool} = nothing,
     gamma::Union{Nothing,Float64,Bool} = nothing,
     phi::Union{Nothing,Float64,Bool} = nothing,
-    seasonal::String = "additive",
+    seasonal::Symbol = :additive,
     exponential::Bool = false,
     lambda::Union{Nothing,Float64} = nothing,
     biasadj::Bool = false,
     warnings::Bool = true,
     options::NelderMeadOptions
 )
-    if !(seasonal in ["additive", "multiplicative"])
+    if !(seasonal in (:additive, :multiplicative))
         throw(
             ArgumentError(
-                "Invalid seasonal component: must be 'additive' or 'multiplicative'.",
+                "Invalid seasonal component: must be :additive or :multiplicative.",
             ),
         )
     end
@@ -1338,7 +1338,7 @@ function holt_winters_conventional(
     origx = copy(x)
     lenx = length(x)
 
-    if (lambda == "auto") || (typeof(lambda) == Float64 && !isnothing(lambda))
+    if (lambda === :auto) || (typeof(lambda) == Float64 && !isnothing(lambda))
         x, lambda = box_cox(x, m, lambda = lambda)
     end
 
@@ -1365,7 +1365,7 @@ function holt_winters_conventional(
     end
 
     if (isnothing(gamma) || gamma > 0)
-        if seasonal == "multiplicative" && any(x .<= 0)
+        if seasonal === :multiplicative && any(x .<= 0)
             throw(ArgumentError("Data must be positive for multiplicative Holt-Winters."))
         end
     end
@@ -1376,7 +1376,7 @@ function holt_winters_conventional(
 
     # Initialize l0, b0, s0
     if !isnothing(gamma) && gamma isa Bool && !gamma
-        seasonal = "none"
+        seasonal = :none
         l_start = x[1]
         s_start = 0.0
         if isnothing(beta) || !(beta isa Bool) || beta
@@ -1389,7 +1389,7 @@ function holt_winters_conventional(
     else
         l_start = mean(x[1:m])
         b_start = (mean(x[m+1:m+m]) - l_start) / m
-        if seasonal == "additive"
+        if seasonal === :additive
             s_start = x[1:m] .- l_start
         else
             s_start = x[1:m] ./ l_start
@@ -1411,9 +1411,9 @@ function holt_winters_conventional(
         trendtype = "A"
     end
 
-    if seasonal == "none"
+    if seasonal === :none
         seasontype = "N"
-    elseif seasonal == "multiplicative"
+    elseif seasonal === :multiplicative
         seasontype = "M"
     else
         seasontype = "A"
@@ -1430,7 +1430,7 @@ function holt_winters_conventional(
         lower,
         upper,
         m,
-        "usual",
+        :usual,
     )
 
     select = Int.(isnothing.([alpha, beta, gamma]))
@@ -1542,14 +1542,14 @@ function holt_winters_conventional(
 
     damped = phi < 1.0
 
-    if seasonal == "additive"
-        components = ["A", trendtype, seasontype, damped]
-    elseif seasonal == "multiplicative"
-        components = ["M", trendtype, seasontype, damped]
-    elseif seasonal == "none" && exponential
-        components = ["M", trendtype, seasontype, damped]
+    if seasonal === :additive
+        components = ["A", trendtype, seasontype, string(damped)]
+    elseif seasonal === :multiplicative
+        components = ["M", trendtype, seasontype, string(damped)]
+    elseif seasonal === :none && exponential
+        components = ["M", trendtype, seasontype, string(damped)]
     else
-        components = ["A", trendtype, seasontype, damped]
+        components = ["A", trendtype, seasontype, string(damped)]
     end
 
     param = Dict("alpha" => alpha)
@@ -1586,9 +1586,9 @@ function holt_winters_conventional(
         push!(method_parts, "Damped")
     end
 
-    if seasonal == "additive"
+    if seasonal === :additive
         push!(method_parts, "additive seasonality")
-    elseif seasonal == "multiplicative"
+    elseif seasonal === :multiplicative
         push!(method_parts, "multiplicative seasonality")
     end
 
@@ -1603,7 +1603,7 @@ function holt_winters_conventional(
         initstates,
         states,
         state_names,
-        final_fit.SSE,
+        final_fit.sse,
         sigma2,
         m,
         lambda,
@@ -1764,7 +1764,7 @@ function objective_fun(
     elseif opt_crit == OPT_CRIT_MAE
         return sum(abs, view(workspace.e, 1:length(y))) / length(y)
     else
-        error("Unknown optimization criterion")
+        throw(ArgumentError("Unknown optimization criterion"))
     end
 end
 
@@ -1854,9 +1854,9 @@ function etsmodel(
     phi::Union{Float64,Nothing,Bool},
     lower::Vector{Float64},
     upper::Vector{Float64},
-    opt_crit::String,
+    opt_crit::Symbol,
     nmse::Int,
-    bounds::String,
+    bounds::Symbol,
     options::NelderMeadOptions)
 
     if seasontype == "N"
@@ -2077,9 +2077,9 @@ function process_parameters(
     missing_method::MissingMethod,
 )
 
-    opt_crit = match_arg(opt_crit, ["lik", "amse", "mse", "sigma", "mae"])
-    bounds = match_arg(bounds, ["both", "usual", "admissible"])
-    ic = match_arg(ic, ["aicc", "aic", "bic"])
+    opt_crit = _check_arg(opt_crit, (:lik, :amse, :mse, :sigma, :mae), "opt_crit")
+    bounds = _check_arg(bounds, (:both, :usual, :admissible), "bounds")
+    ic = _check_arg(ic, (:aicc, :aic, :bic), "ic")
 
     ny = length(y)
     y = handle_missing(y, missing_method; m=m)
@@ -2139,7 +2139,7 @@ function ets_refit(
     phi = get(model.par, "phi", nothing)
 
     modelcomponents = string(model.components[1], model.components[2], model.components[3])
-    damped = model.components[4]
+    damped = parse(Bool, model.components[4])
 
     if use_initial_values
         errortype = string(modelcomponents[1])
@@ -2197,8 +2197,8 @@ function ets_refit(
             loglik,
             model.initstate,
             states,
-            nothing,
-            model.SSE,
+            String[],
+            model.sse,
             sigma2,
             m,
             model.lambda,
@@ -2333,7 +2333,7 @@ function fit_small_dataset(
                 alpha = alpha,
                 beta = beta,
                 gamma = gamma,
-                seasonal = (seasontype == "M" ? "multiplicative" : "additive"),
+                seasonal = (seasontype == "M" ? :multiplicative : :additive),
                 exponential = (trendtype == "M"),
                 phi = phi,
                 lambda = lambda,
@@ -2355,7 +2355,7 @@ function fit_small_dataset(
                 alpha = alpha,
                 beta = beta,
                 gamma = false,
-                seasonal = "additive",
+                seasonal = :additive,
                 exponential = (trendtype == "M"),
                 phi = phi,
                 lambda = lambda,
@@ -2378,7 +2378,7 @@ function fit_small_dataset(
                 alpha = alpha,
                 beta = false,
                 gamma = false,
-                seasonal = "additive",
+                seasonal = :additive,
                 exponential = false,
                 phi = nothing,
                 lambda = lambda,
@@ -2400,7 +2400,7 @@ function fit_small_dataset(
             alpha = alpha,
             beta = beta,
             gamma = false,
-            seasonal = "additive",
+            seasonal = :additive,
             exponential = (trendtype == "M"),
             phi = phi,
             lambda = lambda,
@@ -2419,7 +2419,7 @@ function fit_small_dataset(
             alpha = alpha,
             beta = false,
             gamma = false,
-            seasonal = "additive",
+            seasonal = :additive,
             exponential = (trendtype == "M"),
             phi = phi,
             lambda = lambda,
@@ -2443,11 +2443,11 @@ function fit_small_dataset(
 end
 
 function get_ic(fit, ic)
-    if ic == "aic"
+    if ic === :aic
         return fit["aic"]
-    elseif ic == "bic"
+    elseif ic === :bic
         return fit["bic"]
-    elseif ic == "aicc"
+    elseif ic === :aicc
         return fit["aicc"]
     else
         return Inf
@@ -2629,7 +2629,7 @@ function fit_best_ets_model(
     end
 
     method = "ETS($(best_e),$(best_t)$(best_d ? "d" : ""),$(best_s))"
-    components = [best_e, best_t, best_s, best_d]
+    components = [best_e, best_t, best_s, string(best_d)]
     return Dict("model" => best_model, "method" => method, "components" => components)
 end
 
@@ -2644,14 +2644,14 @@ function ets_base_model(
     gamma::Union{Float64,Bool,Nothing} = nothing,
     phi::Union{Float64,Bool,Nothing} = nothing,
     additive_only::Bool = false,
-    lambda::Union{Float64,Bool,Nothing,String} = nothing,
+    lambda::Union{Float64,Bool,Nothing,Symbol} = nothing,
     biasadj::Bool = false,
     lower::AbstractArray = [0.0001, 0.0001, 0.0001, 0.8],
     upper::AbstractArray = [0.9999, 0.9999, 0.9999, 0.98],
-    opt_crit::String = "lik",
+    opt_crit::Symbol = :lik,
     nmse::Int = 3,
-    bounds::String = "both",
-    ic::String = "aicc",
+    bounds::Symbol = :both,
+    ic::Symbol = :aicc,
     restrict::Bool = true,
     allow_multiplicative_trend::Bool = false,
     use_initial_values::Bool = false,
@@ -2760,7 +2760,7 @@ function ets_base_model(
     model = model["model"]
     np = length(model["par"])
     sigma2 = sum(skipmissing(model["residuals"] .^ 2)) / (ny - np)
-    SSE = NaN
+    sse = NaN
 
     if !isnothing(lambda)
         model["fitted"] =
@@ -2779,7 +2779,7 @@ function ets_base_model(
         initstates,
         model["states"],
         ["cff"],
-        SSE,
+        sse,
         sigma2,
         m,
         lambda,
@@ -2841,7 +2841,7 @@ function simulate_ets(
     elseif length(innov) == nsim
         e = innov
     else
-        error("Length of innov must be equal to nsim")
+        throw(ArgumentError("Length of innov must be equal to nsim"))
     end
 
     if components[1] == "M"
@@ -2858,7 +2858,7 @@ function simulate_ets(
     # phi = ifelse(!components[4], 1.0, check_component(par, "phi"))
     beta = (trend == 0) ? 0.0 : check_component(par, "beta")
     gamma = (season == 0) ? 0.0 : check_component(par, "gamma")
-    phi = components[4] ? check_component(par, "phi") : 1.0
+    phi = parse(Bool, components[4]) ? check_component(par, "phi") : 1.0
     simulate_ets_base(
         initstate,
         m,

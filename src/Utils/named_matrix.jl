@@ -26,10 +26,10 @@ struct NamedMatrix{T}
                             rownames::Union{Vector{String},Nothing},
                             colnames::Vector{String}) where {T}
         if !isnothing(rownames) && size(data,1) != length(rownames)
-            error("Row names do not match number of rows")
+            throw(ArgumentError("Row names do not match number of rows"))
         end
         if size(data,2) != length(colnames)
-            error("Col names do not match number of columns")
+            throw(ArgumentError("Col names do not match number of columns"))
         end
         new{T}(data, rownames, colnames)
     end
@@ -59,7 +59,7 @@ function select_rows(nm::NamedMatrix, rows)
 end
 
 function setrow!(nm::NamedMatrix{T}, i::Integer, row) where {T}
-    length(row) == size(nm.data, 2) || error("Row length != number of columns")
+    length(row) == size(nm.data, 2) || throw(ArgumentError("Row length != number of columns"))
     nm.data[i, :] .= row
     return nm
 end
@@ -233,7 +233,7 @@ function get_elements(
         rns = isnothing(nm.rownames) ? string.(1:size(nm.data,1)) : nm.rownames
         rowinds = [findfirst(==(r), rns) for r in row]
     else
-        error("Unsupported type for row")
+        throw(ArgumentError("Unsupported type for row"))
     end
 
     # Col indices
@@ -248,12 +248,12 @@ function get_elements(
     elseif isa(col, AbstractVector{String})
         colinds = [findfirst(==(c), nm.colnames) for c in col]
     else
-        error("Unsupported type for col")
+        throw(ArgumentError("Unsupported type for col"))
     end
 
     # Check for any not found
     if any(isnothing, rowinds) || any(isnothing, colinds)
-        error("One or more row/column names not found in NamedMatrix.")
+        throw(ArgumentError("One or more row/column names not found in NamedMatrix."))
     end
 
     # Convert possible `Nothing`s to Ints
@@ -300,7 +300,7 @@ function get_vector(
     elseif size(arr, 2) == 1
         return vec(arr)   # Column as vector
     else
-        error("Selection is not a single row or column; cannot convert to vector.")
+        throw(ArgumentError("Selection is not a single row or column; cannot convert to vector."))
     end
 end
 
@@ -316,7 +316,7 @@ fitting.  An error is thrown if any required column is missing from
 function align_columns(new_data::NamedMatrix, ref_colnames::Vector{String})
     # Check for missing columns
     missing = setdiff(ref_colnames, new_data.colnames)
-    !isempty(missing) && error("Missing columns in new_data: $missing")
+    !isempty(missing) && throw(ArgumentError("Missing columns in new_data: $missing"))
     # Find indices in new_data.colnames for each ref_colname
     rownames = new_data.rownames
     col_indices = [findfirst(==(name), new_data.colnames) for name in ref_colnames]
@@ -353,7 +353,7 @@ nm2.colnames  # ["dift", "x1", "x2"]
 """
 function add_drift_term(nm::NamedMatrix, dift::AbstractArray, dift_name::String)
     if length(dift) != size(nm.data, 1)
-        error("Dift vector length must match the number of rows in the matrix")
+        throw(ArgumentError("Dift vector length must match the number of rows in the matrix"))
     end
     newdata = hcat(dift, nm.data)
     newcolnames = vcat([dift_name], nm.colnames)
@@ -388,10 +388,10 @@ nm2.colnames  # ["x1", "x2", "x3"]
 """
 function cbind(nm::NamedMatrix{T}, newcols::AbstractMatrix{T}, newcolnames::Vector{String}; prepend::Bool=false) where {T}
     if size(newcols, 1) != size(nm.data, 1)
-        error("New columns must have the same number of rows as the NamedMatrix")
+        throw(ArgumentError("New columns must have the same number of rows as the NamedMatrix"))
     end
     if size(newcols, 2) != length(newcolnames)
-        error("Number of new column names must match number of columns in newcols")
+        throw(ArgumentError("Number of new column names must match number of columns in newcols"))
     end
     if prepend
         combined_data = hcat(newcols, nm.data)

@@ -122,7 +122,7 @@ function forecast(object::NaiveFit;
         if all_fraction
             level = 100.0 .* level
         elseif any(lv -> lv <= 0.0 || lv > 99.99, level)
-            error("Confidence levels must be in (0, 1) (fractions) or (0, 99.99] (percentages)")
+            throw(ArgumentError("Confidence levels must be in (0, 1) (fractions) or (0, 99.99] (percentages)"))
         end
     end
 

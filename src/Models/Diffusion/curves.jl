@@ -196,6 +196,6 @@ function get_curve(model_type::DiffusionModelType, n::Int, params::NamedTuple)
     elseif model_type == Weibull
         return weibull_curve(n, params.m, params.a, params.b)
     else
-        error("Unknown model type: $model_type")
+        throw(ArgumentError("Unknown model type: $model_type"))
     end
 end

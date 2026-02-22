@@ -5,17 +5,17 @@
                max_d::Int=2, max_D::Int=1,
                start_p::Int=2, start_q::Int=2, start_P::Int=1, start_Q::Int=1,
                stationary::Bool=false, seasonal::Bool=true,
-               ic::String="aicc", stepwise::Bool=true, nmodels::Int=94, trace::Bool=false,
+               ic::Symbol=:aicc, stepwise::Bool=true, nmodels::Int=94, trace::Bool=false,
                approximation::Union{Nothing,Bool}=nothing, method=nothing,
                truncate::Union{Nothing,Int}=nothing, xreg::Union{Nothing,NamedMatrix}=nothing,
-               test::String="kpss", test_args=NamedTuple(),
-               seasonal_test::String="seas", seasonal_test_args=NamedTuple(),
+               test::Symbol=:kpss, test_args=NamedTuple(),
+               seasonal_test::Symbol=:seas, seasonal_test_args=NamedTuple(),
                allowdrift::Bool=true, allowmean::Bool=true,
                lambda::Union{Nothing,Real}=nothing, biasadj::Bool=false;
                kwargs...) -> ArimaFit
 
 Fit the “best” ARIMA/SARIMA model to a univariate time series by minimizing an information
-criterion (`"aicc"` default, `"aic"`, or `"bic"`). By default a fast stepwise search is used
+criterion (`:aicc` default, `:aic`, or `:bic`). By default a fast stepwise search is used
 (similar in spirit to Hyndman & Khandakar, 2008); seasonal differencing may be selected via a
 measure of seasonal strength (Wang, Smith & Hyndman, 2006) unless overridden.
 
@@ -33,7 +33,7 @@ For a single series where runtime is less of a concern, consider `stepwise=false
 - `start_p`, `start_q`, `start_P`, `start_Q`: Initial orders for stepwise search.
 - `stationary`, `seasonal`: Restrict to stationary or nonseasonal families if desired.
 - `allowdrift`, `allowmean`: Permit drift (when `d>0`) and mean (when `d==0`) terms.
-- `ic`: `"aicc"|"aic"|"bic"`, the information criterion to minimize.
+- `ic`: `:aicc|:aic|:bic`, the information criterion to minimize.
 - `stepwise`, `nmodels`, `trace`: Control the search strategy and logging.
 - `approximation`, `truncate`: Use a fast CSS-style approximation during search (then refit by ML).
 - `xreg`: Optional exogenous regressors (ARIMAX). Must have `size(xreg,1) == length(y)`.
@@ -92,7 +92,7 @@ function auto_arima(
     start_Q::Int = 1,
     stationary::Bool = false,
     seasonal::Bool = true,
-    ic::String = "aicc",
+    ic::Symbol = :aicc,
     stepwise::Bool = true,
     nmodels::Int = 94,
     trace::Bool = false,
@@ -100,9 +100,9 @@ function auto_arima(
     method = nothing,
     truncate::Union{Nothing,Int} = nothing,
     xreg::Union{Nothing,NamedMatrix} = nothing,
-    test::String = "kpss",
+    test::Symbol = :kpss,
     test_args = NamedTuple(),
-    seasonal_test::String = "seas",
+    seasonal_test::Symbol = :seas,
     seasonal_test_args = NamedTuple(),
     allowdrift::Bool = true,
     allowmean::Bool = true,
@@ -111,9 +111,9 @@ function auto_arima(
     kwargs...,
 )
 
-    ic = match_arg(ic, ["aicc", "aic", "bic"])
-    test = match_arg(test, ["kpss", "adf", "pp"])
-    seasonal_test = match_arg(seasonal_test, ["seas", "ocsb", "hegy", "ch"])
+    _check_arg(ic, (:aicc, :aic, :bic), "ic")
+    _check_arg(test, (:kpss, :adf, :pp), "test")
+    _check_arg(seasonal_test, (:seas, :ocsb, :hegy, :ch), "seasonal_test")
 
     if isnothing(approximation)
         approximation = (length(y) > 150 | m > 12)
@@ -125,7 +125,7 @@ function auto_arima(
 
     # Check for all missing data before trying to slice xreg
     if isnothing(firstnm)
-        error("All data are missing")
+        throw(ArgumentError("All data are missing"))
     end
 
     if !isnothing(xreg)
@@ -135,7 +135,7 @@ function auto_arima(
     # Check constant data
     if is_constant(x)
         if all(ismissing, x)
-            error("All data are missing")
+            throw(ArgumentError("All data are missing"))
         end
 
         if allowmean
@@ -171,7 +171,7 @@ function auto_arima(
 
     # Use AIC for tiny sample
     if serieslength ≤ 3
-        ic = "aic"
+        ic = :aic
     end
 
     # Box-Cox transform
@@ -189,7 +189,7 @@ function auto_arima(
             xregg = drop_constant_columns(xregg)
 
             if is_rank_deficient(xregg)
-                error("xreg is rank deficient")
+                throw(ArgumentError("xreg is rank deficient"))
             end
             j = .!ismissing.(x) .& .!ismissing.(row_sums(xregg))
             # OLS with intercept for unit root test residuals
@@ -215,7 +215,7 @@ function auto_arima(
     elseif isnothing(D) && length(xx) <= 2 * m
         D = 0
     elseif isnothing(D)
-        D = nsdiffs(x = xx, m = m, test = seasonal_test, maxD = max_D, seasonal_test_args...)
+        D = nsdiffs(xx, m; test = seasonal_test, maxD = max_D, seasonal_test_args...)
         # Ensure xreg not null after seasonal differencing
         if D > 0 && !isnothing(xregg)
             diffxreg = diff(xregg; differences = D, lag = m)
@@ -253,7 +253,7 @@ function auto_arima(
 
     # non-seasonal differencing choice
     if isnothing(d)
-        d = ndiffs(x = dx, test = test, max_d = max_d, test_args...)
+        d = ndiffs(dx; test = test, maxd = max_d, test_args...)
         # Ensure xreg not null after additional (non-seasonal) differencing
         if d > 0 && !isnothing(xregg)
             diffxreg = diff(diffxreg; differences = d, lag = 1)
@@ -284,7 +284,7 @@ function auto_arima(
 
     # terminal checks
     if length(dx) == 0
-        error("Not enough data to proceed")
+        throw(ArgumentError("Not enough data to proceed"))
     elseif is_constant(dx)
         # constant process (after differencing)
         if isnothing(xreg)

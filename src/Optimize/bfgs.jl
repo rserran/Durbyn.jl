@@ -233,7 +233,7 @@ function bfgs(
     end
 
     if report_interval <= 0
-        error("REPORT must be > 0 (method = \"BFGS\")")
+        throw(ArgumentError("REPORT must be > 0 (method = \"BFGS\")"))
     end
 
     workspace = BFGSWorkspace(n0, n)
@@ -241,7 +241,7 @@ function bfgs(
     if isnothing(g)
         ndeps_actual = isnothing(step_sizes) ? fill(1e-3, n0) : step_sizes
         if length(ndeps_actual) != n0
-            error("ndeps must have length $n0")
+            throw(ArgumentError("ndeps must have length $n0"))
         end
 
         if isnothing(numgrad_cache)

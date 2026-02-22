@@ -1,7 +1,6 @@
 
 """
-    ndiffs(x; alpha=0.05, test=:kpss, type=:level, max_d=2; kwargs...) -> Int
-    ndiffs(;x, alpha=0.05, test="kpss", type="level", max_d=2; kwargs...) -> Int
+    ndiffs(x; alpha=0.05, test=:kpss, deterministic=:level, maxd=2; kwargs...) -> Int
 
 Number of differences required for a stationary series.
 
@@ -28,9 +27,9 @@ based on a unit-root test selected via `test`.
 
 Internally, the following mappings are used when calling the tests:
 
-- KPSS: `type = :level` → `"mu"`, `type = :trend` → `"tau"`
-- ADF:  `type = :level` → `:drift`, `type = :trend` → `:trend`
-- PP:   `type = :level` → `model = "constant"`, `type = :trend` → `model = "trend"`
+- KPSS: `deterministic = :level` → `:mu`, `deterministic = :trend` → `:tau`
+- ADF:  `deterministic = :level` → `:drift`, `deterministic = :trend` → `:trend`
+- PP:   `deterministic = :level` → `model = :constant`, `deterministic = :trend` → `model = :trend`
 
 Critical values and their nominal significance levels are linearly interpolated
 to obtain a p-value (matching R’s `approx(..., rule=2)` behavior).
@@ -142,22 +141,6 @@ function ndiffs(x::AbstractVector;
     return d
 end
 
-function ndiffs(;
-    x::AbstractVector,
-    alpha::Float64=0.05,
-    test::String="kpss",
-    type::String="level",
-    max_d::Int=2,
-    kwargs...,)::Int
-
-    test = match_arg(test, ["kpss", "adf", "pp"])
-    type = match_arg(type, ["level", "trend"])
-
-    test = Symbol(test)
-    type = Symbol(type)
-
-    ndiffs(x, alpha=alpha, test=test, deterministic=type, maxd=max_d, kwargs...)
-end
 
 function run_unit_root_check(xvec::AbstractVector;
     test::Symbol=:kpss,
@@ -166,17 +149,17 @@ function run_unit_root_check(xvec::AbstractVector;
     d_for_msg::Int=0,
     kwargs...)::Union{Bool,Missing}
 
-    kpss_type = deterministic === :trend ? "tau" : "mu"
-    adf_type = deterministic === :trend ? "trend" : "drift"
-    pp_model = deterministic === :trend ? "trend" : "constant"
+    kpss_type = deterministic === :trend ? :tau : :mu
+    adf_type = deterministic === :trend ? :trend : :drift
+    pp_model = deterministic === :trend ? :trend : :constant
 
     function with_kpss_lag(y; kwargs...)
         nt = length(y)
         default_lag = trunc(Int, 3 * sqrt(nt) / 13)
         if !haskey(kwargs, :use_lag)
-            return kpss(; y, type=kpss_type, use_lag=default_lag)
+            return kpss(y; type=kpss_type, use_lag=default_lag)
         else
-            return kpss(; y, type=kpss_type, kwargs...)
+            return kpss(y; type=kpss_type, kwargs...)
         end
     end
     norm_p(p) = (ismissing(p) || (p isa Real && isnan(p))) ? missing : p
@@ -188,14 +171,14 @@ function run_unit_root_check(xvec::AbstractVector;
             return p === missing ? missing : p < alpha
 
         elseif test === :adf
-            t = adf(; y=xvec, type=adf_type, kwargs...)
+            t = adf(xvec; type=adf_type, kwargs...)
             tau_stat = t.teststat.data[1, 1]
             tau_cvals = vec(t.cval[1, :])
             p = norm_p(only(approx(tau_cvals, t.clevels, xout=[tau_stat], rule=2).y))
             return p === missing ? missing : p > alpha
 
         elseif test === :pp
-            t = phillips_perron(; x=xvec, type="Z_tau", model=pp_model, kwargs...)
+            t = phillips_perron(xvec; type=:Z_tau, model=pp_model, kwargs...)
             p = norm_p(only(approx(t.cval, t.clevels, xout=[t.teststat[1]], rule=2).y))
             return p === missing ? missing : p > alpha
 

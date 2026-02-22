@@ -5,7 +5,7 @@ import LinearAlgebra: diag, dot, qr
 import Distributions: Normal, quantile as dist_quantile
 
 using ..Optimize
-import ..Utils: dropmissing, as_integer, mean2, is_constant, match_arg, NamedMatrix, ismissingish, duplicated, completecases
+import ..Utils: dropmissing, as_integer, mean2, is_constant, _check_arg, NamedMatrix, ismissingish, duplicated, completecases
 import ..Generics: plot, summary, fitted, residuals, predict
 
 include("box_cox.jl")

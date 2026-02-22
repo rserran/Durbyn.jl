@@ -9,10 +9,10 @@ intermittent demand forecasting method.
 
 - `initial::AbstractArray`: Initial values for demand and interval smoothing.
 
-- `method::String`: The Croston method used. One of:
-    - `"croston"` (Classical Croston Method)
-    - `"sba"` (Croston Method with Syntetos-Boylan Approximation)
-    - `"sbj"` (Croston-Shale-Boylan-Johnston Bias Correction Method)
+- `method::Symbol`: The Croston method used. One of:
+    - `:croston` (Classical Croston Method)
+    - `:sba` (Croston Method with Syntetos-Boylan Approximation)
+    - `:sbj` (Croston-Shale-Boylan-Johnston Bias Correction Method)
 
 - `na_rm::Bool`: Whether missing values were removed prior to fitting. When `true`,
   `x` contains the cleaned series (missings already removed).
@@ -24,7 +24,7 @@ intermittent demand forecasting method.
 struct IntermittentDemandCrostonFit
     weights::AbstractArray
     initial::AbstractArray
-    method::String
+    method::Symbol
     na_rm::Bool
     x::AbstractArray
 end
@@ -42,12 +42,12 @@ A container for storing the results of an intermittent demand forecast model.
   initial values, method, and input data.
 
 - `method::Any`: A label describing the forecasting method used
-  (`"croston"`, `"sba"`, or `"sbj"`).
+  (`:croston`, `:sba`, or `:sbj`).
 """
 struct IntermittentDemandForecast
-    mean::Any
+    mean::Union{Vector{Float64}, Nothing}
     model::IntermittentDemandCrostonFit
-    method::Any
+    method::String
 end
 
 function show(io::IO, model::IntermittentDemandCrostonFit)
@@ -154,7 +154,7 @@ function croston_cost(params, x, cost_metric, method, fixed_weights, num_params,
     forecast_result = pred_crost(x, 0, collect(weights), inits, method, false)
     forecast_input = forecast_result["frc_in"]
 
-    return evaluation_metrics(x, forecast_input)[cost_metric]
+    return evaluation_metrics(x, forecast_input)[String(cost_metric)]
 end
 
 function pred_crost(x,h,w,init,method,na_rm)
@@ -175,7 +175,7 @@ function pred_crost(x,h,w,init,method,na_rm)
     intervals = [nzd[1], nzd[2:k] .- nzd[1:(k-1)]...]
 
     if !(isa(init, Array))
-        init = init == "mean" ? [z[1], mean(intervals)] : [z[1], intervals[1]]
+        init = init === :mean ? [z[1], mean(intervals)] : [z[1], intervals[1]]
     end
 
     w = convert(Vector{Float64}, w)
@@ -188,8 +188,8 @@ function pred_crost(x,h,w,init,method,na_rm)
 
     a_demand, a_interval = length(w) == 1 ? (w[1], w[1]) : (w[1], w[2])
 
-    coeff = method == "sba" ? 1 - (a_interval / 2) :
-            method == "sbj" ? 1 - a_interval / (2 - a_interval) :
+    coeff = method === :sba ? 1 - (a_interval / 2) :
+            method === :sbj ? 1 - a_interval / (2 - a_interval) :
             1
 
     for i in 2:k
@@ -239,13 +239,13 @@ function pred_crost(x,h,w,init,method,na_rm)
     )
 end
 
-function fit_croston(x, method::String="croston", cost::String="mse", 
-                     nop::Int=2, init_strategy::String="mean", 
+function fit_croston(x, method::Symbol=:croston, cost::Symbol=:mse,
+                     nop::Int=2, init_strategy::Symbol=:mean,
                      optimize_init::Bool=true, na_rm::Bool=false)
 
-    method = match_arg(method, ["croston", "sba", "sbj"])
-    cost = match_arg(cost, ["mar", "msr", "mae", "mse"])
-    init_strategy = match_arg(init_strategy, ["naive", "mean"])
+    method = _check_arg(method, (:croston, :sba, :sbj), "method")
+    cost = _check_arg(cost, (:mar, :msr, :mae, :mse), "cost_metric")
+    init_strategy = _check_arg(init_strategy, (:naive, :mean), "init_strategy")
 
     if !(nop in [1, 2])
         @warn "nop can be either 1 or 2. Overriden to 2."
@@ -266,7 +266,7 @@ function fit_croston(x, method::String="croston", cost::String="mse",
     intervals = [nzd[1]; diff(nzd)]
 
     z = x[nzd]
-    init = init_strategy == "mean" ? [z[1], mean(intervals)] : [z[1], intervals[1]]
+    init = init_strategy === :mean ? [z[1], mean(intervals)] : [z[1], intervals[1]]
 
     opt = croston_opt(x, method, cost, nothing, nop, init, optimize_init)
 
@@ -318,7 +318,7 @@ println(fc.mean)
 """
 function forecast(object::IntermittentDemandCrostonFit; h::Int = 10)
     out = predict_croston(object, h)
-    return IntermittentDemandForecast(out["frc_out"], object, object.method)
+    return IntermittentDemandForecast(out["frc_out"], object, string(object.method))
 end
 
 """

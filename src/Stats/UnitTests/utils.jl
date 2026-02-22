@@ -44,7 +44,7 @@ function _bartlett_LRV(res::Vector{Float64}, n::Int, lmax::Int)
 end
 
 function _pvalue_from_cvals(teststat::Float64, cvals::Vector{Float64}, probs::Vector{Float64})
-    @assert length(cvals) == length(probs) && length(cvals) >= 2
+    (length(cvals) == length(probs) && length(cvals) >= 2) || throw(ArgumentError("cvals and probs must have the same length and length ≥ 2"))
     
     xs = collect(cvals)
     ys = collect(probs)

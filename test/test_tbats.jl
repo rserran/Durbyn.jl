@@ -12,7 +12,7 @@ import Durbyn.Generics: Forecast, forecast, fitted
     @test length(fit.errors) == 144
     @test all(isfinite, fit.fitted_values)
     @test all(isfinite, fit.errors)
-    @test isfinite(fit.AIC)
+    @test !isnothing(fit.aic)
     @test fit.seasonal_periods == [12]
 
     fitted_view = fitted(fit)
@@ -44,7 +44,7 @@ end
     @test fit.seasonal_periods == [12]
     @test !isnothing(fit.k_vector)
     @test all(isfinite, fit.fitted_values)
-    @test isfinite(fit.AIC)
+    @test !isnothing(fit.aic)
 
     fc = forecast(fit; h=12)
     @test length(fc.mean) == 12
@@ -58,7 +58,7 @@ end
     @test !isnothing(fit.lambda)
     @test isfinite(fit.lambda)
     @test all(isfinite, fit.fitted_values)
-    @test isfinite(fit.AIC)
+    @test !isnothing(fit.aic)
 
     fc = forecast(fit; h=12)
     @test length(fc.mean) == 12
@@ -71,7 +71,7 @@ end
     @test fit isa TBATSModel
     @test isnothing(fit.lambda)
     @test all(isfinite, fit.fitted_values)
-    @test isfinite(fit.AIC)
+    @test !isnothing(fit.aic)
 
     fc = forecast(fit; h=12)
     @test length(fc.mean) == 12
@@ -150,7 +150,7 @@ end
     @test fit isa TBATSModel
     @test fit.seasonal_periods == [52.18]
     @test all(isfinite, fit.fitted_values)
-    @test isfinite(fit.AIC)
+    @test !isnothing(fit.aic)
 
     fc = forecast(fit; h=26)
     @test length(fc.mean) == 26

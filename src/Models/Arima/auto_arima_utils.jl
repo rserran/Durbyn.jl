@@ -123,12 +123,12 @@ function fit_custom_arima(
     order = PDQ(0, 0, 0),
     seasonal = PDQ(0, 0, 0),
     constant::Bool = true,
-    ic::AbstractString = "aic",
+    ic::Symbol = :aic,
     trace::Bool = false,
     approximation::Bool = false,
     offset::Float64 = 0.0,
     xreg::Union{Nothing,NamedMatrix} = nothing,
-    method::Union{Nothing,AbstractString} = nothing,
+    method::Union{Nothing,Symbol} = nothing,
     nstar::Union{Nothing,Int} = nothing,  # Pre-computed series length
     kwargs...,
 )
@@ -152,9 +152,9 @@ function fit_custom_arima(
 
     if isnothing(method)
         if approximation
-            method = "CSS"
+            method = :css
         else
-            method = "CSS-ML"
+            method = :css_ml
         end
     end
 
@@ -236,7 +236,7 @@ function fit_custom_arima(
         end
         #npar = length(get_vector(fit.coef, row = 1)[fit.mask]) + 1
         npar = (sum(fit.mask) + 1)
-        if method == "CSS"
+        if method === :css
             fit.aic = offset + nstar * log(fit.sigma2) + 2 * npar
         end
         if !(isnan(fit.aic))
@@ -248,7 +248,7 @@ function fit_custom_arima(
                 fit.aicc = fit.aic + 2 * npar * (npar + 1) / (nstar - npar - 1)
             end
             # Use direct field access instead of string comparison
-            fit.ic = ic == "bic" ? fit.bic : (ic == "aicc" ? fit.aicc : fit.aic)
+            fit.ic = ic === :bic ? fit.bic : (ic === :aicc ? fit.aicc : fit.aic)
         else
             fit.aic, fit.bic, fit.aicc, fit.ic = Inf, Inf, Inf, Inf
         end
@@ -347,7 +347,7 @@ function fit_custom_arima(
                 Array{Float64}(undef, 0),
                 zeros(1, 1),
                 zeros(1, 1),
-                0.0,
+                zeros(1, 1),
                 0.0,
                 zeros(1, 1),
             ),
@@ -373,7 +373,7 @@ function search_arima(
     max_Q::Int = 2,
     max_order::Int = 5,
     stationary::Bool = false,
-    ic = "aic",
+    ic = :aic,
     trace::Bool = false,
     approximation::Bool = false,
     xreg = nothing,
@@ -382,7 +382,7 @@ function search_arima(
     allowmean::Bool = true,
     kwargs...,
 )
-    ic = match_arg(ic, ["aic", "aicc", "bic"])
+    _check_arg(ic, (:aic, :aicc, :bic), "ic")
 
     allowdrift = allowdrift && (d + D == 1)
     allowmean = allowmean && (d + D == 0)

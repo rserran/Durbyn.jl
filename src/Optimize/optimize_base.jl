@@ -1,5 +1,5 @@
 """
-    optimize(x0, fn; grad=nothing, method="Nelder-Mead", lower=-Inf, upper=Inf,
+    optimize(x0, fn; grad=nothing, method=:nelder_mead, lower=-Inf, upper=Inf,
              control=Dict(), hessian=false, kwargs...)
 
 Unified interface for general-purpose optimization.
@@ -16,11 +16,11 @@ parameter/function scaling and returning results in a consistent format.
 
 - `grad::Union{Function,Nothing}=nothing`: Gradient function, called as `grad(x; kwargs...)`.
   If `nothing`, numerical gradients are computed for methods that need them.
-- `method::String="Nelder-Mead"`: Optimization method:
-  - `"Nelder-Mead"` — derivative-free simplex
-  - `"BFGS"` — quasi-Newton with line search
-  - `"L-BFGS-B"` — limited-memory BFGS with box constraints
-  - `"Brent"` — 1D optimization (scalar `x0` only)
+- `method::Symbol=:nelder_mead`: Optimization method:
+  - `:nelder_mead` — derivative-free simplex
+  - `:bfgs` — quasi-Newton with line search
+  - `:lbfgsb` — limited-memory BFGS with box constraints
+  - `:brent` — 1D optimization (scalar `x0` only)
 - `lower`, `upper`: Bounds for L-BFGS-B and Brent methods.
 - `control::Dict`: Control parameters (trace, fnscale, parscale, ndeps, maxit,
   abstol, reltol, gtol, alpha, beta, gamma, REPORT, lmm, factr, pgtol).
@@ -46,19 +46,19 @@ rosenbrock(x) = 100 * (x[2] - x[1]^2)^2 + (1 - x[1])^2
 rosenbrock_grad(x) = [-400*x[1]*(x[2]-x[1]^2) - 2*(1-x[1]), 200*(x[2]-x[1]^2)]
 
 result = optimize([-1.2, 1.0], rosenbrock)
-result = optimize([-1.2, 1.0], rosenbrock; grad=rosenbrock_grad, method="BFGS")
-result = optimize([0.5, 0.5], rosenbrock; method="L-BFGS-B",
+result = optimize([-1.2, 1.0], rosenbrock; grad=rosenbrock_grad, method=:bfgs)
+result = optimize([0.5, 0.5], rosenbrock; method=:lbfgsb,
                   lower=[0.0, 0.0], upper=[2.0, 2.0])
 
 f1d(x) = (x[1] - 2)^2
-result = optimize([0.0], f1d; method="Brent", lower=-5.0, upper=5.0)
+result = optimize([0.0], f1d; method=:brent, lower=-5.0, upper=5.0)
 ```
 """
 _to_scalar(val::Number) = Float64(val)
-_to_scalar(::Nothing) = error("objective function in optimize evaluates to length 0 not 1")
-_to_scalar(::Missing) = error("objective function in optimize evaluates to length 0 not 1")
+_to_scalar(::Nothing) = throw(ArgumentError("objective function in optimize evaluates to length 0 not 1"))
+_to_scalar(::Missing) = throw(ArgumentError("objective function in optimize evaluates to length 0 not 1"))
 function _to_scalar(val)
-    length(val) == 1 || error("objective function in optimize evaluates to length $(length(val)) not 1")
+    length(val) == 1 || throw(ArgumentError("objective function in optimize evaluates to length $(length(val)) not 1"))
     Float64(first(val))
 end
 
@@ -71,7 +71,7 @@ end
 
 function optimize(x0::AbstractVector{<:Real}, fn::Function;
                grad::Union{Function,Nothing}=nothing,
-               method::String="Nelder-Mead",
+               method::Symbol=:nelder_mead,
                lower::Union{Real,AbstractVector{<:Real}}=-Inf,
                upper::Union{Real,AbstractVector{<:Real}}=Inf,
                control::Dict=Dict(),
@@ -84,29 +84,27 @@ function optimize(x0::AbstractVector{<:Real}, fn::Function;
 
     npar = length(x0)
 
-    valid_methods = ["Nelder-Mead", "BFGS", "L-BFGS-B", "Brent"]
-    if !(method in valid_methods)
-        error("method must be one of: $(join(valid_methods, ", "))")
+    valid_methods = [:nelder_mead, :bfgs, :lbfgsb, :brent]
+    _check_arg(method, valid_methods, "method")
+
+    if (any(lower .> -Inf) || any(upper .< Inf)) && !(method === :lbfgsb || method === :brent)
+        @warn "bounds can only be used with method :lbfgsb or :brent, switching to :lbfgsb"
+        method = :lbfgsb
     end
 
-    if (any(lower .> -Inf) || any(upper .< Inf)) && !(method in ["L-BFGS-B", "Brent"])
-        @warn "bounds can only be used with method L-BFGS-B or Brent, switching to L-BFGS-B"
-        method = "L-BFGS-B"
-    end
-
-    if method == "Brent" && npar != 1
-        error("method = \"Brent\" is only available for one-dimensional optimization")
+    if method === :brent && npar != 1
+        throw(ArgumentError("method = :brent is only available for one-dimensional optimization"))
     end
 
     lower_vec = lower isa Float64 ? fill(lower, npar) : _repeat_to_length(lower, npar)
     upper_vec = upper isa Float64 ? fill(upper, npar) : _repeat_to_length(upper, npar)
 
-    if method == "Brent"
+    if method === :brent
         if !all(isfinite, lower_vec) || !all(isfinite, upper_vec)
-            error("method = \"Brent\" requires finite 'lower' and 'upper' bounds")
+            throw(ArgumentError("method = :brent requires finite 'lower' and 'upper' bounds"))
         end
         if lower_vec[1] >= upper_vec[1]
-            error("'xmin' not less than 'xmax'")
+            throw(ArgumentError("'xmin' not less than 'xmax'"))
         end
     end
 
@@ -115,7 +113,7 @@ function optimize(x0::AbstractVector{<:Real}, fn::Function;
         "fnscale" => 1.0,
         "parscale" => ones(npar),
         "ndeps" => fill(1e-3, npar),
-        "maxit" => (method == "Nelder-Mead" ? 500 : 100),
+        "maxit" => (method === :nelder_mead ? 500 : 100),
         "abstol" => -Inf,
         "reltol" => sqrt(eps(Float64)),
         "gtol" => 0.0,
@@ -144,28 +142,28 @@ function optimize(x0::AbstractVector{<:Real}, fn::Function;
         @warn "read the documentation for 'trace' more carefully"
     end
 
-    if method == "Brent"
+    if method === :brent
         con["parscale"] = ones(npar)
     else
         ps = con["parscale"]
         con["parscale"] = ps isa Number ? fill(Float64(ps), npar) : Float64.(ps)
         if length(con["parscale"]) != npar
-            error("'parscale' is of the wrong length")
+            throw(ArgumentError("'parscale' is of the wrong length"))
         end
     end
 
     nd = con["ndeps"]
     con["ndeps"] = nd isa Number ? fill(Float64(nd), npar) : Float64.(nd)
-    if method in ["BFGS", "L-BFGS-B"] && isnothing(grad) && length(con["ndeps"]) != npar
-        error("'ndeps' is of the wrong length")
+    if (method === :bfgs || method === :lbfgsb) && isnothing(grad) && length(con["ndeps"]) != npar
+        throw(ArgumentError("'ndeps' is of the wrong length"))
     end
 
-    if method == "L-BFGS-B" && any(haskey.(Ref(control), ["reltol", "abstol"]))
-        @warn "method L-BFGS-B uses 'factr' (and 'pgtol') instead of 'reltol' and 'abstol'"
+    if method === :lbfgsb && any(haskey.(Ref(control), ["reltol", "abstol"]))
+        @warn "method :lbfgsb uses 'factr' (and 'pgtol') instead of 'reltol' and 'abstol'"
     end
 
-    if method == "Nelder-Mead" && npar == 1 && con["warn.1d.NelderMead"]
-        @warn "one-dimensional optimization by Nelder-Mead is unreliable: use \"Brent\" instead"
+    if method === :nelder_mead && npar == 1 && con["warn.1d.NelderMead"]
+        @warn "one-dimensional optimization by Nelder-Mead is unreliable: use :brent instead"
     end
 
     fnscale = con["fnscale"]
@@ -186,7 +184,7 @@ function optimize(x0::AbstractVector{<:Real}, fn::Function;
     grad_scaled = if !isnothing(grad)
         _check_grad = g -> begin
             (g isa AbstractVector && length(g) == npar) ||
-                error("gradient in optimize evaluated to length $(g isa AbstractVector ? length(g) : 0) not $npar")
+                throw(ArgumentError("gradient in optimize evaluated to length $(g isa AbstractVector ? length(g) : 0) not $npar"))
             g
         end
         if fnscale != 1.0 || any(parscale .!= 1.0)
@@ -200,13 +198,13 @@ function optimize(x0::AbstractVector{<:Real}, fn::Function;
 
     x0_scaled = x0 ./ parscale
 
-    result = if method == "Nelder-Mead"
+    result = if method === :nelder_mead
         _optim_neldermead(x0_scaled, fn_scaled, con, lower_vec, upper_vec, parscale)
-    elseif method == "BFGS"
+    elseif method === :bfgs
         _optim_bfgs(x0_scaled, fn_scaled, grad_scaled, con, parscale)
-    elseif method == "L-BFGS-B"
+    elseif method === :lbfgsb
         _optim_lbfgsb(x0_scaled, fn_scaled, grad_scaled, con, lower_vec, upper_vec, parscale)
-    elseif method == "Brent"
+    elseif method === :brent
         _optim_brent(x0_scaled[1], fn_scaled, con, lower_vec[1], upper_vec[1], parscale[1])
     end
 

@@ -1,6 +1,6 @@
 """
-    croston_classic(x::AbstractVector; init_strategy::String = "mean", number_of_params::Int = 2,
-                    cost_metric::String = "mar", optimize_init::Bool = true, rm_missing::Bool = false)
+    croston_classic(x::AbstractVector; init_strategy::Symbol = :mean, number_of_params::Int = 2,
+                    cost_metric::Symbol = :mar, optimize_init::Bool = true, rm_missing::Bool = false)
         -> IntermittentDemandCrostonFit
 
 Forecast intermittent demand using the classical Croston (1972) method.
@@ -10,19 +10,19 @@ Forecast intermittent demand using the classical Croston (1972) method.
 - `x::AbstractVector`: Input time series vector representing intermittent demand (including zeros and possibly `missing` values).
   Must contain at least two non-zero values.
 
-- `init_strategy::String`: Initialization strategy for smoothing. Default is `"mean"`.
-    - `"mean"`: Initialize using mean of non-zero demands and intervals (recommended)
-    - `"naive"`: Initialize using first observed demand and interval
+- `init_strategy::Symbol`: Initialization strategy for smoothing. Default is `:mean`.
+    - `:mean`: Initialize using mean of non-zero demands and intervals (recommended)
+    - `:naive`: Initialize using first observed demand and interval
 
 - `number_of_params::Int`: Number of smoothing parameters to optimize. Default is `2`.
     - `1`: Single smoothing parameter for both demand size and intervals
     - `2`: Separate smoothing parameters (recommended for better accuracy)
 
-- `cost_metric::String`: Optimization cost function for parameter tuning. Default is `"mar"`.
-    - `"mar"`: Mean Absolute Rate (recommended by Kourentzes 2014)
-    - `"msr"`: Mean Squared Rate (recommended by Kourentzes 2014)
-    - `"mae"`: Mean Absolute Error (classical metric)
-    - `"mse"`: Mean Squared Error (classical metric)
+- `cost_metric::Symbol`: Optimization cost function for parameter tuning. Default is `:mar`.
+    - `:mar`: Mean Absolute Rate (recommended by Kourentzes 2014)
+    - `:msr`: Mean Squared Rate (recommended by Kourentzes 2014)
+    - `:mae`: Mean Absolute Error (classical metric)
+    - `:mse`: Mean Squared Error (classical metric)
 
 - `optimize_init::Bool`: If `true`, initial values are optimized alongside smoothing parameters.
   Default is `true`. Recommended for short series.
@@ -73,9 +73,9 @@ resids = residuals(fit)
 
 # Custom parameters for specific use cases
 fit_custom = croston_classic(demand;
-    init_strategy = "naive",
+    init_strategy = :naive,
     number_of_params = 1,
-    cost_metric = "mse",
+    cost_metric = :mse,
     optimize_init = false
 )
 ```
@@ -112,19 +112,19 @@ https://doi.org/10.1016/j.ijpe.2014.06.007
 """
 
 function croston_classic(x::AbstractVector;
-    init_strategy::String = "mean",
+    init_strategy::Symbol = :mean,
     number_of_params::Int = 2,
-    cost_metric::String = "mar",
+    cost_metric::Symbol = :mar,
     optimize_init::Bool = true,
     rm_missing::Bool = false,
 )
-    return fit_croston(x, "croston", cost_metric, number_of_params, init_strategy, optimize_init, rm_missing)
+    return fit_croston(x, :croston, cost_metric, number_of_params, init_strategy, optimize_init, rm_missing)
 end
 
 
 """
-    croston_sba(x::AbstractVector; init_strategy::String = "mean", number_of_params::Int = 2,
-                cost_metric::String = "mar", optimize_init::Bool = true, rm_missing::Bool = false)
+    croston_sba(x::AbstractVector; init_strategy::Symbol = :mean, number_of_params::Int = 2,
+                cost_metric::Symbol = :mar, optimize_init::Bool = true, rm_missing::Bool = false)
         -> IntermittentDemandCrostonFit
 
 Forecast intermittent demand using the Syntetos-Boylan Approximation (SBA) - **Recommended Method**.
@@ -134,19 +134,19 @@ Forecast intermittent demand using the Syntetos-Boylan Approximation (SBA) - **R
 - `x::AbstractVector`: Input time series vector representing intermittent demand (including zeros and possibly `missing` values).
   Must contain at least two non-zero values.
 
-- `init_strategy::String`: Initialization strategy for smoothing. Default is `"mean"`.
-    - `"mean"`: Initialize using mean of non-zero demands and intervals (recommended)
-    - `"naive"`: Initialize using first observed demand and interval
+- `init_strategy::Symbol`: Initialization strategy for smoothing. Default is `:mean`.
+    - `:mean`: Initialize using mean of non-zero demands and intervals (recommended)
+    - `:naive`: Initialize using first observed demand and interval
 
 - `number_of_params::Int`: Number of smoothing parameters to optimize. Default is `2`.
     - `1`: Single smoothing parameter for both demand size and intervals
     - `2`: Separate smoothing parameters (recommended for better accuracy)
 
-- `cost_metric::String`: Optimization cost function for parameter tuning. Default is `"mar"`.
-    - `"mar"`: Mean Absolute Rate (recommended by Kourentzes 2014)
-    - `"msr"`: Mean Squared Rate (recommended by Kourentzes 2014)
-    - `"mae"`: Mean Absolute Error (classical metric)
-    - `"mse"`: Mean Squared Error (classical metric)
+- `cost_metric::Symbol`: Optimization cost function for parameter tuning. Default is `:mar`.
+    - `:mar`: Mean Absolute Rate (recommended by Kourentzes 2014)
+    - `:msr`: Mean Squared Rate (recommended by Kourentzes 2014)
+    - `:mae`: Mean Absolute Error (classical metric)
+    - `:mse`: Mean Squared Error (classical metric)
 
 - `optimize_init::Bool`: If `true`, initial values are optimized alongside smoothing parameters.
   Default is `true`. Recommended for short series.
@@ -251,18 +251,18 @@ International Journal of Production Economics, 156, 180–190.
 https://doi.org/10.1016/j.ijpe.2014.06.007
 """
 function croston_sba(x::AbstractVector;
-    init_strategy::String = "mean",
+    init_strategy::Symbol = :mean,
     number_of_params::Int = 2,
-    cost_metric::String = "mar",
+    cost_metric::Symbol = :mar,
     optimize_init::Bool = true,
     rm_missing::Bool = false,
 )
-    return fit_croston(x, "sba", cost_metric, number_of_params, init_strategy, optimize_init, rm_missing)
+    return fit_croston(x, :sba, cost_metric, number_of_params, init_strategy, optimize_init, rm_missing)
 end
 
 """
-    croston_sbj(x::AbstractVector; init_strategy::String = "mean", number_of_params::Int = 2,
-                cost_metric::String = "mar", optimize_init::Bool = true, rm_missing::Bool = false)
+    croston_sbj(x::AbstractVector; init_strategy::Symbol = :mean, number_of_params::Int = 2,
+                cost_metric::Symbol = :mar, optimize_init::Bool = true, rm_missing::Bool = false)
         -> IntermittentDemandCrostonFit
 
 Forecast intermittent demand using the Shale-Boylan-Johnston (SBJ) bias correction method.
@@ -272,19 +272,19 @@ Forecast intermittent demand using the Shale-Boylan-Johnston (SBJ) bias correcti
 - `x::AbstractVector`: Input time series vector representing intermittent demand (including zeros and possibly `missing` values).
   Must contain at least two non-zero values.
 
-- `init_strategy::String`: Initialization strategy for smoothing. Default is `"mean"`.
-    - `"mean"`: Initialize using mean of non-zero demands and intervals (recommended)
-    - `"naive"`: Initialize using first observed demand and interval
+- `init_strategy::Symbol`: Initialization strategy for smoothing. Default is `:mean`.
+    - `:mean`: Initialize using mean of non-zero demands and intervals (recommended)
+    - `:naive`: Initialize using first observed demand and interval
 
 - `number_of_params::Int`: Number of smoothing parameters to optimize. Default is `2`.
     - `1`: Single smoothing parameter for both demand size and intervals
     - `2`: Separate smoothing parameters (recommended for better accuracy)
 
-- `cost_metric::String`: Optimization cost function for parameter tuning. Default is `"mar"`.
-    - `"mar"`: Mean Absolute Rate (recommended by Kourentzes 2014)
-    - `"msr"`: Mean Squared Rate (recommended by Kourentzes 2014)
-    - `"mae"`: Mean Absolute Error (classical metric)
-    - `"mse"`: Mean Squared Error (classical metric)
+- `cost_metric::Symbol`: Optimization cost function for parameter tuning. Default is `:mar`.
+    - `:mar`: Mean Absolute Rate (recommended by Kourentzes 2014)
+    - `:msr`: Mean Squared Rate (recommended by Kourentzes 2014)
+    - `:mae`: Mean Absolute Error (classical metric)
+    - `:mse`: Mean Squared Error (classical metric)
 
 - `optimize_init::Bool`: If `true`, initial values are optimized alongside smoothing parameters.
   Default is `true`. Recommended for short series.
@@ -392,13 +392,13 @@ International Journal of Production Economics, 156, 180–190.
 https://doi.org/10.1016/j.ijpe.2014.06.007
 """
 function croston_sbj(x::AbstractVector;
-    init_strategy::String = "mean",
+    init_strategy::Symbol = :mean,
     number_of_params::Int = 2,
-    cost_metric::String = "mar",
+    cost_metric::Symbol = :mar,
     optimize_init::Bool = true,
     rm_missing::Bool = false,
 )
-    return fit_croston(x, "sbj", cost_metric, number_of_params, init_strategy, optimize_init, rm_missing)
+    return fit_croston(x, :sbj, cost_metric, number_of_params, init_strategy, optimize_init, rm_missing)
 end
 
 

@@ -96,7 +96,7 @@ function _get_param_names(model_type::DiffusionModelType)
     elseif model_type == Weibull
         return [:m, :a, :b]
     else
-        error("Unknown model type: $model_type")
+        throw(ArgumentError("Unknown model type: $model_type"))
     end
 end
 
@@ -115,7 +115,7 @@ function _dict_to_params(d::Dict{Symbol, Float64}, model_type::DiffusionModelTyp
     elseif model_type == Weibull
         return (m=d[:m], a=d[:a], b=d[:b])
     else
-        error("Unknown model type: $model_type")
+        throw(ArgumentError("Unknown model type: $model_type"))
     end
 end
 
@@ -152,7 +152,7 @@ end
 
 """
     fit_diffusion(y; model_type=Bass, cleanlead=true, w=nothing, loss=2, cumulative=true,
-                  mscal=true, maxiter=500, method="L-BFGS-B", initpar="linearize") -> DiffusionFit
+                  mscal=true, maxiter=500, method=:lbfgsb, initpar=:linearize) -> DiffusionFit
 
 Fit a diffusion model to adoption data.
 
@@ -171,11 +171,11 @@ Fit a diffusion model to adoption data.
 - `cumulative::Bool=true`: Optimize on cumulative adoption values
 - `mscal::Bool=true`: Scale market parameter for optimization stability
 - `maxiter::Int=500`: Maximum optimization iterations
-- `method::String="L-BFGS-B"`: Optimization method
+- `method::Symbol=:lbfgsb`: Optimization method (`:lbfgsb`, `:nelder_mead`, `:bfgs`)
 - `initpar`: Initialization method. Can be:
-  - `"linearize"` or `"linearise"` (default): analytical methods with Bass optimization
+  - `:linearize` or `:linearise` (default): analytical methods with Bass optimization
     for Gompertz/GSGompertz init
-  - `"preset"`: fixed preset values
+  - `:preset`: fixed preset values
   - `Vector{<:Real}`: numeric vector of initial parameter values (length must match model)
 
 # Returns
@@ -212,8 +212,8 @@ function fit_diffusion(y::AbstractVector{<:Real};
                        cumulative::Bool=true,
                        mscal::Bool=true,
                        maxiter::Int=500,
-                       method::String="L-BFGS-B",
-                       initpar::Union{String, AbstractVector{<:Real}}="linearize")
+                       method::Symbol=:lbfgsb,
+                       initpar::Union{Symbol, AbstractVector{<:Real}}=:linearize)
 
     T = Float64
     y_original = collect(T.(y))
@@ -253,7 +253,7 @@ function fit_diffusion(y::AbstractVector{<:Real};
         init_params = _dict_to_params(init_dict, model_type)
         is_linearize = false
     else
-        initpar_norm = initpar == "linearise" ? "linearize" : initpar
+        initpar_norm = initpar === :linearise ? :linearize : initpar
 
         try
             init_params = get_init(model_type, y_clean;
@@ -265,9 +265,9 @@ function fit_diffusion(y::AbstractVector{<:Real};
         catch
             @warn "Linearization failed, reverting to preset initial values"
             init_params = preset_init(model_type, y_clean; mscal=mscal)
-            initpar_norm = "preset"
+            initpar_norm = :preset
         end
-        is_linearize = initpar_norm == "linearize"
+        is_linearize = initpar_norm === :linearize
     end
 
     if is_linearize
@@ -335,7 +335,7 @@ function fit_diffusion(y::AbstractVector{<:Real};
         end
     end
 
-    if method == "L-BFGS-B"
+    if method === :lbfgsb
         lower = fill(T(1e-9), length(x0))
         upper = fill(T(Inf), length(x0))
     else
@@ -361,9 +361,9 @@ function fit_diffusion(y::AbstractVector{<:Real};
                        upper=upper,
                        control=Dict("maxit" => maxiter))
 
-        if method != "Nelder-Mead"
+        if method !== :nelder_mead
             res_nm = optimize(x0_start, objective;
-                              method="Nelder-Mead",
+                              method=:nelder_mead,
                               control=Dict("maxit" => maxiter))
             if res_nm.value < res.value
                 res = res_nm

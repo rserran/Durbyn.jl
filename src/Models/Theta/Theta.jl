@@ -74,7 +74,7 @@ Struct holding a fitted Theta model.
 - `y::Vector{Float64}`: Original series (possibly seasonally adjusted)
 - `m::Int`: Seasonal period
 - `decompose::Bool`: Whether seasonal decomposition was applied
-- `decomposition_type::String`: "multiplicative" or "additive"
+- `decomposition_type::Symbol`: `:multiplicative`, `:additive`, or `:none`
 - `seasonal_component::Union{Vector{Float64}, Nothing}`: Seasonal factors
 - `y_original::Vector{Float64}`: Original unadjusted series
 """
@@ -90,7 +90,7 @@ struct ThetaFit
     y::Vector{Float64}
     m::Int
     decompose::Bool
-    decomposition_type::String
+    decomposition_type::Symbol
     seasonal_component::Union{Vector{Float64}, Nothing}
     y_original::Vector{Float64}
 end
@@ -361,7 +361,7 @@ function optimize_theta_parameters(y::AbstractVector{T}, model_type::ThetaModelT
 
     # Use L-BFGS-B for bounded optimization
     result = optimize(x0, objective;
-                      method="L-BFGS-B",
+                      method=:lbfgsb,
                       lower=lower, upper=upper,
                       control=Dict("maxit" => 1000))
 
@@ -442,7 +442,7 @@ function fit_theta_model(y::AbstractVector{T}, m::Int, model_type::ThetaModelTyp
         y,
         m,
         false,
-        "none",
+        :none,
         nothing,
         y
     )
@@ -488,7 +488,7 @@ function theta(y::AbstractVector{<:Real}, m::Int=1;
 end
 
 """
-    auto_theta(y, m; model=nothing, decomposition_type="multiplicative",
+    auto_theta(y, m; model=nothing, decomposition_type=:multiplicative,
                nmse=3, kwargs...) -> ThetaFit
 
 Automatically select and fit the best Theta model variant.
@@ -502,7 +502,7 @@ Performs automatic model selection by:
 - `y`: Time series data
 - `m`: Seasonal period
 - `model`: Specific model type to fit (nothing = try all and select best)
-- `decomposition_type`: "multiplicative" or "additive" for seasonal adjustment
+- `decomposition_type`: `:multiplicative` or `:additive` for seasonal adjustment
 - `initial_level`, `alpha`, `theta`: Optional fixed parameter values
 - `nmse`: Steps for multi-step MSE
 
@@ -523,7 +523,7 @@ function auto_theta(y::AbstractVector{<:Real}, m::Int;
                     alpha::Union{Real, Nothing}=nothing,
                     theta_param::Union{Real, Nothing}=nothing,
                     nmse::Int=3,
-                    decomposition_type::String="multiplicative")
+                    decomposition_type::Symbol=:multiplicative)
     y = collect(Float64.(y))
     n = length(y)
 
@@ -554,18 +554,18 @@ function auto_theta(y::AbstractVector{<:Real}, m::Int;
     data_positive = minimum(y) > 0
 
     if do_decompose
-        if decomposition_type == "multiplicative" && !data_positive
-            decomposition_type = "additive"
+        if decomposition_type === :multiplicative && !data_positive
+            decomposition_type = :additive
         end
 
         seasonal_component = decompose(x=y, m=m, type=decomposition_type).seasonal
 
-        if decomposition_type == "multiplicative" && any(seasonal_component .< 0.01)
-            decomposition_type = "additive"
-            seasonal_component = decompose(x=y, m=m, type="additive").seasonal
+        if decomposition_type === :multiplicative && any(seasonal_component .< 0.01)
+            decomposition_type = :additive
+            seasonal_component = decompose(x=y, m=m, type=:additive).seasonal
         end
 
-        y_work = if decomposition_type == "additive"
+        y_work = if decomposition_type === :additive
             y .- seasonal_component
         else
             y ./ seasonal_component
@@ -603,7 +603,7 @@ function auto_theta(y::AbstractVector{<:Real}, m::Int;
     end
 
     if do_decompose
-        adjusted_residuals = if decomposition_type == "multiplicative"
+        adjusted_residuals = if decomposition_type === :multiplicative
             best_fit.residuals .* seasonal_component
         else
             best_fit.residuals .+ seasonal_component
@@ -639,7 +639,7 @@ function auto_theta(y::AbstractVector{<:Real}, m::Int;
         best_fit.y,
         m,
         false,
-        "none",
+        :none,
         nothing,
         y
     )
@@ -743,7 +743,7 @@ function forecast(fit::ThetaFit; h::Int, level::Vector{<:Real}=[80, 95])
         seasonal_indices = fit.seasonal_component[1:fit.m]
         seas_forecast = repeat_seasonal(seasonal_indices, h)
 
-        if fit.decomposition_type == "multiplicative"
+        if fit.decomposition_type === :multiplicative
             forecasts .*= seas_forecast
             for key in keys(intervals)
                 intervals[key] .*= seas_forecast

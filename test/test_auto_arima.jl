@@ -193,9 +193,9 @@ get_D(fit) = fit.arma[7]
             92.4, 114.8, 103.5, 114.4, 104.0, 106.9, 100.5, 100.3, 111.0, 112.0, 103.6, 90.3
         ]
 
-        fit_aicc = auto_arima(test_data, 1; ic="aicc", seasonal=false)
-        fit_aic = auto_arima(test_data, 1; ic="aic", seasonal=false)
-        fit_bic = auto_arima(test_data, 1; ic="bic", seasonal=false)
+        fit_aicc = auto_arima(test_data, 1; ic=:aicc, seasonal=false)
+        fit_aic = auto_arima(test_data, 1; ic=:aic, seasonal=false)
+        fit_bic = auto_arima(test_data, 1; ic=:bic, seasonal=false)
 
         @test isfinite(fit_aicc.aicc)
         @test isfinite(fit_aic.aic)
@@ -273,7 +273,7 @@ get_D(fit) = fit.arma[7]
     @testset "All Missing Data Error" begin
         # Bug fix: should throw clear error for all-missing data
         all_missing = [missing, missing, missing, missing]
-        @test_throws ErrorException auto_arima(all_missing, 1)
+        @test_throws ArgumentError auto_arima(all_missing, 1)
     end
 
     @testset "m < 1 Validation" begin
@@ -375,7 +375,7 @@ end
         # With d=1, ARIMA(1,1,1) WITHOUT drift should be selected
         # because the no-drift model has lower BIC. Before the fix, Julia
         # always tried the same constant setting, never toggling to !constant.
-        fit = auto_arima(nile, 1; d=1, seasonal=false, ic="bic")
+        fit = auto_arima(nile, 1; d=1, seasonal=false, ic=:bic)
 
         # Model should NOT include drift — the toggled (no-drift) model wins on BIC
         @test !("drift" in fit.coef.colnames)

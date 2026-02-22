@@ -65,7 +65,7 @@ function bass_init(y::AbstractVector{<:Real})
 end
 
 """
-    gompertz_init(y; use_bass_optim=false, loss=2, mscal=true, method="L-BFGS-B", maxiter=500) -> NamedTuple
+    gompertz_init(y; use_bass_optim=false, loss=2, mscal=true, method=:lbfgsb, maxiter=500) -> NamedTuple
 
 Initialize Gompertz model parameters using the method from Jukic et al. (2004).
 
@@ -76,7 +76,7 @@ Initialize Gompertz model parameters using the method from Jukic et al. (2004).
 - `use_bass_optim::Bool=false`: If true, use full Bass optimization for m (matches R behavior)
 - `loss::Int=2`: Loss function for Bass optimization
 - `mscal::Bool=true`: Scale market potential for Bass optimization
-- `method::String="L-BFGS-B"`: Optimization method for Bass fitting
+- `method::Symbol=:lbfgsb`: Optimization method for Bass fitting
 - `maxiter::Int=500`: Maximum iterations for Bass fitting
 
 # Returns
@@ -90,7 +90,7 @@ function gompertz_init(y::AbstractVector{<:Real};
                        use_bass_optim::Bool=false,
                        loss::Int=2,
                        mscal::Bool=true,
-                       method::String="L-BFGS-B",
+                       method::Symbol=:lbfgsb,
                        maxiter::Int=500)
     T = Float64
     y = collect(T.(y))
@@ -164,7 +164,7 @@ function gompertz_init(y::AbstractVector{<:Real};
 end
 
 """
-    gsgompertz_init(y; use_bass_optim=false, loss=2, mscal=true, method="L-BFGS-B", maxiter=500) -> NamedTuple
+    gsgompertz_init(y; use_bass_optim=false, loss=2, mscal=true, method=:lbfgsb, maxiter=500) -> NamedTuple
 
 Initialize Gamma/Shifted Gompertz model parameters.
 Uses Bass model as base (assumes c=1 initially).
@@ -176,7 +176,7 @@ Uses Bass model as base (assumes c=1 initially).
 - `use_bass_optim::Bool=false`: If true, use full Bass optimization (matches R behavior)
 - `loss::Int=2`: Loss function for Bass optimization
 - `mscal::Bool=true`: Scale market potential for Bass optimization
-- `method::String="L-BFGS-B"`: Optimization method for Bass fitting
+- `method::Symbol=:lbfgsb`: Optimization method for Bass fitting
 - `maxiter::Int=500`: Maximum iterations for Bass fitting
 
 # Returns
@@ -191,7 +191,7 @@ function gsgompertz_init(y::AbstractVector{<:Real};
                          use_bass_optim::Bool=false,
                          loss::Int=2,
                          mscal::Bool=true,
-                         method::String="L-BFGS-B",
+                         method::Symbol=:lbfgsb,
                          maxiter::Int=500)
     T = Float64
 
@@ -290,9 +290,9 @@ This matches R's behavior of calling diffusionEstim(..., type="bass") in gompert
 Respects the caller's method and maxiter settings.
 """
 function _fit_bass_for_init(y::AbstractVector{<:Real}, loss::Int, mscal::Bool,
-                            method::String, maxiter::Int)
+                            method::Symbol, maxiter::Int)
     fit = fit_diffusion(y; model_type=Bass, loss=loss, mscal=mscal, cleanlead=true,
-                        cumulative=false, method=method, maxiter=maxiter, initpar="linearize")
+                        cumulative=false, method=method, maxiter=maxiter, initpar=:linearize)
     return fit.params
 end
 
@@ -331,7 +331,7 @@ end
 """
     preset_init(model_type, y; mscal=true) -> NamedTuple
 
-Return preset initial parameter values for diffusion models (matches R's initpar="preset").
+Return preset initial parameter values for diffusion models (matches R's initpar=:preset).
 
 # Arguments
 - `model_type::DiffusionModelType`: The type of diffusion model
@@ -369,12 +369,12 @@ function preset_init(model_type::DiffusionModelType, y::AbstractVector{<:Real}; 
         m = T(0.5) * scale_factor
         return (m=m, a=T(0.5), b=T(0.5))
     else
-        error("Unknown model type: $model_type")
+        throw(ArgumentError("Unknown model type: $model_type"))
     end
 end
 
 """
-    get_init(model_type, y; initpar="linearize", loss=2, mscal=true, method="L-BFGS-B", maxiter=500) -> NamedTuple
+    get_init(model_type, y; initpar=:linearize, loss=2, mscal=true, method=:lbfgsb, maxiter=500) -> NamedTuple
 
 Dispatch to the appropriate initialization function based on model type and initpar setting.
 
@@ -383,23 +383,23 @@ Dispatch to the appropriate initialization function based on model type and init
 - `y::Vector`: Adoption per period data
 
 # Keyword Arguments
-- `initpar::String="linearize"`: Initialization method. "linearize" uses analytical methods
-  (with Bass optimization for Gompertz/GSGompertz). "preset" uses fixed preset values.
+- `initpar::Symbol=:linearize`: Initialization method. `:linearize` uses analytical methods
+  (with Bass optimization for Gompertz/GSGompertz). `:preset` uses fixed preset values.
 - `loss::Int=2`: Loss function for Bass optimization
 - `mscal::Bool=true`: Scale market potential for optimization
-- `method::String="L-BFGS-B"`: Optimization method for Bass fitting
+- `method::Symbol=:lbfgsb`: Optimization method for Bass fitting
 - `maxiter::Int=500`: Maximum iterations for Bass fitting
 
 # Returns
 NamedTuple with initial parameters for the specified model type.
 """
 function get_init(model_type::DiffusionModelType, y::AbstractVector{<:Real};
-                  initpar::String="linearize",
+                  initpar::Symbol=:linearize,
                   loss::Int=2,
                   mscal::Bool=true,
-                  method::String="L-BFGS-B",
+                  method::Symbol=:lbfgsb,
                   maxiter::Int=500)
-    if initpar == "preset"
+    if initpar === :preset
         return preset_init(model_type, y; mscal=mscal)
     end
 
@@ -416,6 +416,6 @@ function get_init(model_type::DiffusionModelType, y::AbstractVector{<:Real};
     elseif model_type == Weibull
         return weibull_init(y)
     else
-        error("Unknown model type: $model_type")
+        throw(ArgumentError("Unknown model type: $model_type"))
     end
 end

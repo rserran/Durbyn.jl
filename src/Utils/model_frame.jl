@@ -60,7 +60,7 @@ pivoted_qr(X::StridedMatrix) =
 
 function _getcol(nm::NamedMatrix{T}, name::AbstractString) where {T}
     idx = findfirst(==(String(name)), nm.colnames)
-    isnothing(idx) && error("Column '$name' not found in NamedMatrix.")
+    isnothing(idx) && throw(ArgumentError("Column '$name' not found in NamedMatrix."))
     return nm.data[:, idx]
 end
 
@@ -111,7 +111,7 @@ function parse_formula(formula::AbstractString)::Formula
     end
 
     rhs = replace(rhs, r"-\s*1" => "+0")
-    occursin('-', rhs) && error("Only '-1' is supported (to remove intercept). Found other '-' in RHS: $rhs")
+    occursin('-', rhs) && throw(ArgumentError("Only '-1' is supported (to remove intercept). Found other '-' in RHS: $rhs"))
 
     tokens = [t for t in split(rhs, '+') if !isempty(t)]
     intercept = true
