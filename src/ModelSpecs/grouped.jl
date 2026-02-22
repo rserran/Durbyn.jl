@@ -805,7 +805,7 @@ function forecast(fitted::GroupedFittedModels;
             done = Threads.atomic_add!(completed, 1) + 1
             if progress && done % progress_stride == 0
                 pct = round(100 * done / n_groups, digits=1)
-                println("  Forecast progress: ", done, "/", n_groups, " (", pct, "%)")
+                @info "  Forecast progress: $done/$n_groups ($pct%)"
             end
         end
 
@@ -828,7 +828,7 @@ function forecast(fitted::GroupedFittedModels;
 
             if progress && idx % progress_stride == 0
                 pct = round(100 * idx / n_groups, digits=1)
-                println("  Forecast progress: ", idx, "/", n_groups, " (", pct, "%)")
+                @info "  Forecast progress: $idx/$n_groups ($pct%)"
             end
         end
     end

@@ -6,7 +6,7 @@ import Distributions: Normal, quantile as dist_quantile
 
 using ..Optimize
 import ..Utils: dropmissing, as_integer, mean2, is_constant, _check_arg, NamedMatrix, ismissingish, duplicated, completecases
-import ..Generics: plot, summary, fitted, residuals, predict
+import ..Generics: plot, summary, fitted, residuals, predict, coef, coefficients, coefs
 
 include("box_cox.jl")
 include("decompose.jl")
@@ -29,7 +29,7 @@ include("acf.jl")
 include("missing_handling.jl")
 
 export box_cox_lambda, box_cox, box_cox!, inv_box_cox, decompose, DecomposedTimeSeries, diff,
-fourier, STLResult, stl, ols, OlsFit, coef, coefficients, coefs, adf, ADF,
+fourier, STLResult, stl, ols, OlsFit, adf, ADF,
 kpss, KPSS, phillips_perron, PhillipsPerron, embed, ndiffs, ocsb, mstl, MSTLResult,
 seasonal_strength, nsdiffs, approx, approxfun, acf, pacf, ACFResult, PACFResult,
 interpolate_missing, longest_contiguous, check_missing, handle_missing,

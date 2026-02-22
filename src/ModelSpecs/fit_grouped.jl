@@ -14,16 +14,16 @@ function _fit_grouped_no_xreg(spec::AbstractModelSpec,
                               parallel::Bool,
                               fail_fast::Bool,
                               builder::Function)
-    println("Grouping data by ", join(groupby_cols, ", "), "...")
+    @info "Grouping data by $(join(groupby_cols, ", "))..."
     grouped_data = group_data(tbl, groupby_cols, target_col, Symbol[], Symbol[], Symbol[])
     n_groups = length(grouped_data)
-    println("Found ", n_groups, " groups")
+    @info "Found $n_groups groups"
 
     models = Dict{NamedTuple, Union{AbstractFittedModel, Exception}}()
     start_time = time()
 
     if parallel && Threads.nthreads() > 1
-        println("Fitting models in parallel (", Threads.nthreads(), " threads)...")
+        @info "Fitting models in parallel ($(Threads.nthreads()) threads)..."
         group_keys = collect(keys(grouped_data))
         results = Vector{Union{AbstractFittedModel, Exception}}(undef, n_groups)
         completed = Threads.Atomic{Int}(0)
@@ -44,7 +44,7 @@ function _fit_grouped_no_xreg(spec::AbstractModelSpec,
             done = Threads.atomic_add!(completed, 1) + 1
             if done % progress_stride == 0
                 pct = round(100 * done / n_groups, digits=1)
-                println("  Progress: ", done, "/", n_groups, " (", pct, "%)")
+                @info "  Progress: $done/$n_groups ($pct%)"
             end
         end
 
@@ -52,7 +52,7 @@ function _fit_grouped_no_xreg(spec::AbstractModelSpec,
             models[key] = results[idx]
         end
     else
-        println("Fitting models sequentially...")
+        @info "Fitting models sequentially..."
         progress_stride = max(1, div(n_groups, 20))
         idx = 0
         for (key, group_data_i) in grouped_data
@@ -68,13 +68,13 @@ function _fit_grouped_no_xreg(spec::AbstractModelSpec,
 
             if idx % progress_stride == 0
                 pct = round(100 * idx / n_groups, digits=1)
-                println("  Progress: ", idx, "/", n_groups, " (", pct, "%)")
+                @info "  Progress: $idx/$n_groups ($pct%)"
             end
         end
     end
 
     fit_time = time() - start_time
-    println("Completed in ", round(fit_time, digits=2), "s")
+    @info "Completed in $(round(fit_time, digits=2))s"
 
     metadata = Dict{Symbol, Any}(
         :fit_time => fit_time,
@@ -156,11 +156,11 @@ function fit_grouped(spec::ArimaSpec, data;
         unique!(xreg_cols)
     end
 
-    println("Grouping data by ", join(groupby_cols, ", "), "...")
+    @info "Grouping data by $(join(groupby_cols, ", "))..."
     start_time = time()
     grouped_data = group_data(tbl, groupby_cols, target_col, xreg_cols, xreg_formula_cols, auto_xreg_cols)
     n_groups = length(grouped_data)
-    println("Found ", n_groups, " groups")
+    @info "Found $n_groups groups"
 
     fit_options = merge(spec.options, Dict{Symbol, Any}(kwargs))
     if spec.auto_xreg && haskey(fit_options, :xreg)
@@ -171,7 +171,7 @@ function fit_grouped(spec::ArimaSpec, data;
 
     if parallel && Threads.nthreads() > 1
         
-        println("Fitting models in parallel (", Threads.nthreads(), " threads)...")
+        @info "Fitting models in parallel ($(Threads.nthreads()) threads)..."
 
         group_keys = collect(keys(grouped_data))
         results = Vector{Union{FittedArima, Exception}}(undef, n_groups)
@@ -190,7 +190,7 @@ function fit_grouped(spec::ArimaSpec, data;
                 n_done = Threads.atomic_add!(completed, 1) + 1
                 if n_done % max(1, div(n_groups, 20)) == 0
                     pct = round(100 * n_done / n_groups, digits=1)
-                    println("  Progress: ", n_done, "/", n_groups, " (", pct, "%)")
+                    @info "  Progress: $n_done/$n_groups ($pct%)"
                 end
             catch err
                 results[i] = err
@@ -202,7 +202,7 @@ function fit_grouped(spec::ArimaSpec, data;
                 n_done = Threads.atomic_add!(completed, 1) + 1
                 if n_done % max(1, div(n_groups, 20)) == 0
                     pct = round(100 * n_done / n_groups, digits=1)
-                    println("  Progress: ", n_done, "/", n_groups, " (", pct, "%)")
+                    @info "  Progress: $n_done/$n_groups ($pct%)"
                 end
             end
         end
@@ -212,7 +212,7 @@ function fit_grouped(spec::ArimaSpec, data;
         end
     else
         
-        println("Fitting models sequentially...")
+        @info "Fitting models sequentially..."
 
         for (i, (key, group_data_i)) in enumerate(grouped_data)
             try
@@ -222,7 +222,7 @@ function fit_grouped(spec::ArimaSpec, data;
                 
                 if i % max(1, div(n_groups, 20)) == 0
                     pct = round(100 * i / n_groups, digits=1)
-                    println("  Progress: ", i, "/", n_groups, " (", pct, "%)")
+                    @info "  Progress: $i/$n_groups ($pct%)"
                 end
             catch err
                 models[key] = err
@@ -233,7 +233,7 @@ function fit_grouped(spec::ArimaSpec, data;
                 
                 if i % max(1, div(n_groups, 20)) == 0
                     pct = round(100 * i / n_groups, digits=1)
-                    println("  Progress: ", i, "/", n_groups, " (", pct, "%)")
+                    @info "  Progress: $i/$n_groups ($pct%)"
                 end
             end
         end
@@ -241,7 +241,7 @@ function fit_grouped(spec::ArimaSpec, data;
 
     
     fit_time = time() - start_time
-    println("Completed in ", round(fit_time, digits=2), "s")
+    @info "Completed in $(round(fit_time, digits=2))s"
 
     
     metadata = Dict{Symbol, Any}(

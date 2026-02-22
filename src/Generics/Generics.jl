@@ -14,8 +14,12 @@ function coef end
 function coefficients end
 function coefs end
 
+# Re-export generics defined in Utils (Utils loads before Generics)
+import ..Utils: head, tail
+
 export Forecast, forecast, fit, accuracy
 export plot, fitted, residuals, summary, predict
 export coef, coefficients, coefs
+export head, tail
 export list_series
 end

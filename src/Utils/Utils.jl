@@ -7,10 +7,12 @@ export NamedMatrix, get_elements, get_vector, align_columns, add_drift_term, cbi
 export Formula, parse_formula, compile, model_matrix, model_frame, as_vector
 export air_passengers, ausbeer, lynx, sunspots, pedestrian_counts, simulate_seasonal_data
 export completecases
+export head, tail
 include("named_matrix.jl")
 include("model_frame.jl")
 include("math.jl")
 include("datasets.jl")
+include("head_tail.jl")
 
 
 """
