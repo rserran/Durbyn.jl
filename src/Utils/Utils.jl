@@ -264,10 +264,6 @@ function duplicated(arr::Vector{T})::Vector{Bool} where {T}
     return result
 end
 
-function match_arg(arg, choices)
-    return !isnothing(findfirst(x -> x == arg, choices)) ? arg : throw(ArgumentError("Invalid argument: $arg. Must be one of: $(join(choices, ", "))"))
-end
-
 function _check_arg(arg::Symbol, choices, name::String="argument")
     arg in choices || throw(ArgumentError(
         "Invalid $name: :$arg. Must be one of: $(join(choices, ", "))"))
