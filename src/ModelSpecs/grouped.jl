@@ -70,7 +70,12 @@ struct GroupedFittedModels <: AbstractFittedModel
         metadata::Dict{Symbol, Any} = Dict{Symbol, Any}()
     )
     
-        groups = sort(collect(keys(models)))
+        ks = collect(keys(models))
+        groups = try
+            sort(ks)
+        catch
+            sort(ks; by=string)
+        end
 
         
         successful = count(v -> !(v isa Exception), values(models))

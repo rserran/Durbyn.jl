@@ -1416,9 +1416,9 @@ macro formula(expr)
     function process_rhs(ex)
         if ex isa Symbol
             if ex === Symbol(".")
-                return :($(esc(:AutoVarTerm))())
+                return :($(AutoVarTerm)())
             end
-            return :($(esc(:VarTerm))($(QuoteNode(ex))))
+            return :($(VarTerm)($(QuoteNode(ex))))
         elseif ex isa QuoteNode || (ex isa Expr && ex.head == :quote)
             # User wrote :x instead of x - give helpful error
             sym = ex isa QuoteNode ? ex.value : ex.args[1]
@@ -1442,11 +1442,11 @@ macro formula(expr)
         local terms_vec = if rhs_result isa Vector
             rhs_result
         elseif rhs_result === nothing
-            $(esc(:AbstractTerm))[]  # Empty vector if only nothing
+            $(AbstractTerm)[]  # Empty vector if only nothing
         else
             [rhs_result]
         end
-        $(esc(:ModelFormula))($(QuoteNode(target)), terms_vec)
+        $(ModelFormula)($(QuoteNode(target)), terms_vec)
     end
 
     return result_expr

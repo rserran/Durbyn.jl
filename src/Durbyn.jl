@@ -138,10 +138,4 @@ public ACFResult, PACFResult, GroupedTable
 # Aliases
 public coef, coefficients, coefs
 
-function __init__()
-    @info """Durbyn.jl is under active development.
-    API may change without notice. Bugs and performance issues may exist.
-    Please report issues at: https://github.com/taf-society/Durbyn.jl/issues"""
-end
-
 end
