@@ -133,8 +133,9 @@ end
 
     Random.seed!(64)
     y2 = randn(100)
-    # Known issue: refit path has a BoundsError with fixed parameter indexing
-    @test_broken (arima_rjh(y2, 1; model=fit1); true)
+    fit2 = arima_rjh(y2, 1; model=fit1)
+    @test fit2 isa ArimaFit
+    @test fit2.coef.colnames == fit1.coef.colnames
 end
 
 # ── forecast() options ──────────────────────────────────────────────────────
@@ -174,8 +175,10 @@ end
     Random.seed!(73)
     y = randn(100)
     fit = arima_rjh(y, 1; order=PDQ(1,0,0))
-    # Known issue: bootstrap forecast requires simulate() which is not yet implemented
-    @test_broken (forecast(fit; h=5, bootstrap=true, npaths=500); true)
+    fc = forecast(fit; h=5, bootstrap=true, npaths=500)
+    @test fc isa Forecast
+    @test length(fc.mean) == 5
+    @test all(isfinite, fc.mean)
 end
 
 # ── fitted() and residuals() generics ──────────────────────────────────────

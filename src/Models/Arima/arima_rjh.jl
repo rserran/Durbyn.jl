@@ -61,6 +61,15 @@ function refit_arima_model(
     order = PDQ(p, d, q)
     seasonal = PDQ(P, D, Q)
 
+    fixed_vec = vec(model.coef.data)
+    # model.xreg is nothing when the original had no external regressors
+    # (intercept is added internally by arima(), not stored in model.xreg).
+    had_xreg = model.xreg isa NamedMatrix
+    if !had_xreg && xreg isa NamedMatrix
+        @warn "Original model had no xreg; ignoring supplied xreg for refit"
+        xreg = nothing
+    end
+
     fit = arima(
         x,
         m_model;
@@ -69,7 +78,7 @@ function refit_arima_model(
         xreg = xreg,
         include_mean = has_coef(model, "intercept"),
         method = method,
-        fixed = model.coef.data,
+        fixed = fixed_vec,
         kwargs...,
     )
 
@@ -208,6 +217,11 @@ function arima_rjh(
 
     x2 = copy(y)
     _check_arg(method, (:css_ml, :ml, :css), "method")
+
+    # Inherit lambda from the original model on refit
+    if isnothing(lambda) && !isnothing(model)
+        lambda = model.lambda
+    end
 
     if !isnothing(lambda)
         x2, lambda = box_cox(x2, m; lambda = lambda)

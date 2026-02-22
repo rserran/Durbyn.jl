@@ -33,6 +33,7 @@ include("arima_rjh.jl")
 include("auto_arima_utils.jl")
 include("auto_arima.jl")
 include("arima_formula_interface.jl")
+include("simulate.jl")
 include("forecast.jl")
 
 end
