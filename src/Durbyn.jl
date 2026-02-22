@@ -61,31 +61,82 @@ import .TableOps: select, query, arrange, groupby, mutate, summarise, summarize,
 import .Stats: acf, pacf, ACFResult, PACFResult, interpolate_missing, longest_contiguous, check_missing, handle_missing
 import .Stats: MissingMethod, Contiguous, Interpolate, FailMissing
 
-export air_passengers, NamedMatrix, get_elements, get_vector, align_columns, add_drift_term, cbind
-export Formula, parse_formula, compile, model_matrix, model_frame
-export plot, fitted, residuals, summary, predict, forecast, fit, accuracy, list_series
-export coef, coefficients, coefs
-export NelderMeadOptions
-export p, q, d, P, Q, D, auto, ModelFormula, @formula, VarTerm, AutoVarTerm, ArarTerm, ThetaTerm, DiffusionTerm
-export e, t, s, drift, ses, holt, hw, holt_winters, croston, arar
-export naive_term, snaive_term, rw_term, meanf_term, NaiveTerm, SnaiveTerm, RwTerm, MeanfTerm
-export AbstractModelSpec, AbstractFittedModel, ArimaSpec, FittedArima, ArarSpec, FittedArar, ArarmaSpec, FittedArarma, EtsSpec, FittedEts
-export SesSpec, FittedSes, HoltSpec, FittedHolt, HoltWintersSpec, FittedHoltWinters
-export BatsSpec, FittedBats, TbatsSpec, FittedTbats, ThetaSpec, FittedTheta, DiffusionSpec, FittedDiffusion
-export CrostonSpec, FittedCroston, ModelCollection, FittedModelCollection, ForecastModelCollection
-export NaiveSpec, FittedNaive, SnaiveSpec, FittedSnaive, RwSpec, FittedRw, MeanfSpec, FittedMeanf
-export model, PanelData, as_table
-export GroupedFittedModels, GroupedForecasts, successful_models, failed_groups
-export arima, arima_rjh, auto_arima, ArimaFit, PDQ
-export ARAR, ArarmaModel, ararma, auto_ararma
-export NaiveFit, MeanFit, naive, snaive, rw, rwf, meanf
-export bats, BATSModel
-export tbats, TBATSModel
-export theta, auto_theta, ThetaFit, ThetaModelType, STM, OTM, DSTM, DOTM
-export diffusion, fit_diffusion, DiffusionFit, DiffusionModelType, Bass, Gompertz, GSGompertz, Weibull
-export select, query, arrange, groupby, mutate, summarise, summarize, pivot_longer, pivot_wider, glimpse, GroupedTable
-export acf, pacf, ACFResult, PACFResult, interpolate_missing, longest_contiguous, check_missing, handle_missing
+# ── export: auto-imported with `using Durbyn` ──────────────────────────────
+
+# Core workflow
+export fit, forecast, accuracy, plot, summary, fitted, residuals, predict, list_series
+
+# Data
+export air_passengers, PanelData, as_table, model
+
+# Grammar (needed inside @formula)
+export @formula
+export p, q, d, P, Q, D, auto, drift
+export e, t, s
+export ses, holt, hw, holt_winters, croston, arar
+export naive_term, snaive_term, rw_term, meanf_term
+
+# Model Specs
+export ArimaSpec, EtsSpec, BatsSpec, TbatsSpec, ThetaSpec, DiffusionSpec
+export SesSpec, HoltSpec, HoltWintersSpec, CrostonSpec
+export ArarSpec, ArarmaSpec
+export NaiveSpec, SnaiveSpec, RwSpec, MeanfSpec
+
+# Array-interface model functions
+export arima, auto_arima, bats, tbats
+export theta, auto_theta
+export ararma, auto_ararma
+export naive, snaive, rw, rwf, meanf
+export diffusion, fit_diffusion
+
+# Stats
+export acf, pacf
+export interpolate_missing, longest_contiguous, check_missing, handle_missing
 export MissingMethod, Contiguous, Interpolate, FailMissing
+
+# TableOps
+export select, query, arrange, groupby, mutate, summarise, summarize
+export pivot_longer, pivot_wider, glimpse
+
+# ── public: accessible as Durbyn.X or `using Durbyn: X` ───────────────────
+
+# Utilities
+public NamedMatrix, get_elements, get_vector, align_columns, add_drift_term, cbind
+public Formula, parse_formula, compile, model_matrix, model_frame
+
+# Optimizer config
+public NelderMeadOptions
+
+# Grammar AST types
+public ModelFormula, VarTerm, AutoVarTerm, ArarTerm, ThetaTerm, DiffusionTerm
+public NaiveTerm, SnaiveTerm, RwTerm, MeanfTerm
+
+# Abstract types
+public AbstractModelSpec, AbstractFittedModel
+
+# Fitted model types
+public FittedArima, FittedEts, FittedBats, FittedTbats, FittedTheta, FittedDiffusion
+public FittedSes, FittedHolt, FittedHoltWinters, FittedCroston
+public FittedArar, FittedArarma
+public FittedNaive, FittedSnaive, FittedRw, FittedMeanf
+
+# Collection types
+public ModelCollection, FittedModelCollection, ForecastModelCollection
+public GroupedFittedModels, GroupedForecasts, successful_models, failed_groups
+
+# Internal model structs
+public ArimaFit, PDQ, arima_rjh
+public NaiveFit, MeanFit
+public BATSModel, TBATSModel
+public ARAR, ArarmaModel
+public ThetaFit, ThetaModelType, STM, OTM, DSTM, DOTM
+public DiffusionFit, DiffusionModelType, Bass, Gompertz, GSGompertz, Weibull
+
+# Result types
+public ACFResult, PACFResult, GroupedTable
+
+# Aliases
+public coef, coefficients, coefs
 
 function __init__()
     @info """Durbyn.jl is under active development.

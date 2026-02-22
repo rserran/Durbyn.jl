@@ -1,5 +1,6 @@
 using Test
 using Durbyn
+using Durbyn: DiffusionFit, DiffusionModelType, Bass, Gompertz, GSGompertz, Weibull
 
 @testset "Diffusion Models" begin
 
