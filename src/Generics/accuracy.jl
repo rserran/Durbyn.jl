@@ -107,8 +107,8 @@ function _compute_accuracy_metrics(forecast_vec::AbstractVector,
                                    training_data::Union{Nothing, AbstractVector}=nothing)
     n = length(actual_vec)
     if length(forecast_vec) != n
-        error("Forecast and actual must have same length. " *
-              "Got forecast: $(length(forecast_vec)), actual: $n")
+        throw(ArgumentError("Forecast and actual must have same length. " *
+              "Got forecast: $(length(forecast_vec)), actual: $n"))
     end
 
     errors = actual_vec .- forecast_vec
@@ -208,7 +208,7 @@ Handle GroupedForecasts (single model, multiple series).
 """
 function _accuracy_grouped_forecasts(fc, actual, training_data, by)
     if !Tables.istable(actual)
-        error("For GroupedForecasts, actual must be a table with group identifiers")
+        throw(ArgumentError("For GroupedForecasts, actual must be a table with group identifiers"))
     end
 
     act_ct = Tables.columntable(actual)
@@ -329,8 +329,8 @@ function _index_actual_by_groups(act_ct::NamedTuple, value_col::Symbol, group_co
         # Validate that all required group columns exist in the actual table
         missing_cols = filter(col -> col ∉ col_names, group_cols)
         if !isempty(missing_cols)
-            error("Actual data is missing required group column(s): $(join(missing_cols, ", ")). " *
-                  "Available columns: $(join(col_names, ", "))")
+            throw(ArgumentError("Actual data is missing required group column(s): $(join(missing_cols, ", ")). " *
+                  "Available columns: $(join(col_names, ", "))"))
         end
     end
 

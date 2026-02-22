@@ -14,19 +14,20 @@ Holds the results of a time series forecast from a fitted models.
 - `mean::Vector{Float64}`  
   Point forecasts for the next `h` time steps beyond the end of the training data.
 
-- `level::Vector{Int}`  
-  Confidence levels (e.g., `[80, 95]`) for the prediction intervals.
+- `level::Union{AbstractVector{<:Real}, Nothing}`
+  Confidence levels (e.g., `[80, 95]`) for the prediction intervals. `nothing` when
+  prediction intervals are disabled.
 
-- `x::Vector{Float64}`  
+- `x::Vector{Float64}`
   The original time series data that the model was trained on.
 
-- `upper::Matrix{Float64}`
+- `upper::Union{Matrix{Float64}, Nothing}`
   Upper prediction bounds, sized `(h, n_levels)`.
-  Each column corresponds to a different confidence level.
+  Each column corresponds to a different confidence level. `nothing` when PI is disabled.
 
-- `lower::Matrix{Float64}`
+- `lower::Union{Matrix{Float64}, Nothing}`
   Lower prediction bounds, sized `(h, n_levels)`.
-  Each column corresponds to a different confidence level.
+  Each column corresponds to a different confidence level. `nothing` when PI is disabled.
 
 - `fitted::Vector{Union{Float64, Missing}}`  
   In-sample fitted values produced by the model.  
@@ -56,13 +57,13 @@ fc.residuals     # model residuals
 struct Forecast
     model::Any
     method::String
-    mean::Any
-    level::Any
-    x::Any
-    upper::Any
-    lower::Any
-    fitted::Any
-    residuals::Any
+    mean::AbstractVector{<:Real}
+    level::Union{AbstractVector{<:Real}, Nothing}
+    x::AbstractVector{<:Real}
+    upper::Union{AbstractMatrix{<:Real}, Nothing}
+    lower::Union{AbstractMatrix{<:Real}, Nothing}
+    fitted::AbstractVector
+    residuals::AbstractVector
 end
 
 function Base.show(io::IO, fc::Forecast)
