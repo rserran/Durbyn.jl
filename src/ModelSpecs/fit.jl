@@ -608,7 +608,9 @@ function forecast(fitted::FittedArima; h::Int, level::Vector{<:Real} = [80, 95],
                 combined_series[name] = vec
             end
             if has_auto
+                internal_auto = Set([:drift, :intercept])
                 for col in auto_cols
+                    col in internal_auto && continue
                     if !haskey(tbl_new, col)
                         available_cols = join(string.(keys(tbl_new)), ", ")
                         throw(ArgumentError(
