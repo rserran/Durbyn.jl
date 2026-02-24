@@ -681,7 +681,7 @@ function handle_seasonality(y::AbstractVector, m::Integer, seasontype::String)
     if n < 3 * m
         F = fourier(y; m = m, K = 1)
         t = collect(1:n)
-        X = hcat(ones(n), t, F)
+        X = hcat(ones(n), t, reduce(hcat, values(F)))
 
         β = X \ y
         α, φ = β[1], β[2]

@@ -3,28 +3,35 @@ cospi(x) = cos(pi * x)
 
 function base_fourier(x, K, times, period)
     length(period) == length(K) || throw(ArgumentError("Number of periods does not match number of orders"))
-        
+
     !any(2 .* K .> period) || throw(ArgumentError("K must not be greater than period/2"))
-    
+
     p = Float64[]
     labels = String[]
-    
+
     for j in eachindex(period)
         if K[j] > 0
             append!(p, (1:K[j]) ./ period[j])
-            append!(labels, [string("S", i, "-", round(period[j])) for i in 1:K[j]])
-            append!(labels, [string("C", i, "-", round(period[j])) for i in 1:K[j]])
+            # Interleaved labels: S1, C1, S2, C2, ...
+            # Period suffix added only for multi-seasonal disambiguation
+            suffix = length(period) > 1 ? string("-", round(Int, period[j])) : ""
+            for i in 1:K[j]
+                push!(labels, string("S", i, suffix))
+                push!(labels, string("C", i, suffix))
+            end
         end
     end
-    
+
+    # Remove duplicate frequencies (multi-seasonal)
     k = duplicated(p)
     p = p[.!k]
     labels = labels[.!repeat(k, inner=2)]
 
+    # Identify frequencies where sinpi=0 (K = period/2)
     k = abs.(2 .* p .- round.(2 .* p)) .> eps(Float64)
 
-    X = zeros(Float64, length(times), 2 * length(p))
-    
+    X = fill(NaN, length(times), 2 * length(p))
+
     for j in eachindex(p)
         if k[j]
             X[:, 2 * j - 1] .= sinpi.(2 .* p[j] .* times)
@@ -32,44 +39,52 @@ function base_fourier(x, K, times, period)
         X[:, 2 * j] .= cospi.(2 .* p[j] .* times)
     end
 
-    colnames = labels
-    valid_columns = .!isnan.(sum(X, dims=1))
-    
-    X = X[:, vec(valid_columns)]
-    
-    return X
+    # Remove NaN columns (skipped sin terms) and corresponding labels
+    valid_columns = vec(.!isnan.(sum(X, dims=1)))
+    X = X[:, valid_columns]
+    labels = labels[valid_columns]
+
+    return X, labels
 end
 """
-    fourier(; x::Vector{T}, m::Int, K::Int, h::Union{Int, Nothing}=nothing) -> Any where T
+    fourier(x::Vector{T}; m::Int, K::Int, h::Union{Int, Nothing}=nothing) -> NamedTuple
 
-Fourier terms for modelling seasonality
+Fourier terms for modelling seasonality. Returns a `NamedTuple` of vectors
+keyed by `:S1`, `:C1`, `:S2`, `:C2`, etc.
+
+When `K == m/2`, the degenerate sin term (`sin(πt) ≡ 0` for integer `t`) is
+automatically dropped, matching R's `forecast::fourier`.
 
 # Arguments
-- `x::Vector{T}`: A vector representing the time series data.
-- `m::Int`: The frequency of the time series data.
-- `K::Int`: The number of Fourier terms to generate.
-- `h::Int`: The forecast horizon.
+- `x::Vector{T}`: Time series data.
+- `m::Int`: Seasonal period (frequency).
+- `K::Int`: Number of Fourier pairs to generate (`K ≤ m/2`).
+- `h::Int`: Forecast horizon. When provided, returns future Fourier terms at
+  times `n+1, …, n+h` instead of the in-sample terms.
 
 # Returns
-- Numerical matrix.
+A `NamedTuple` with `≤ 2K` entries (strictly less when a sin column is dropped).
 
 # Example
 ```julia
 y = air_passengers()
-resulth = fourier(y, m=12, K=6, h=12)
-println(resulth)
-result = fourier(y, m=12, K=6)
-println(result)
+f_train = fourier(y; m=12, K=6)        # NamedTuple with 11 entries
+f_future = fourier(y; m=12, K=6, h=24) # NamedTuple with 11 entries
+
+data = merge((value = y,), f_train)
+newdata = f_future
 ```
 """
 function fourier(x::Vector{T}; m::Int, K::Int, h::Union{Int, Nothing}=nothing) where T
     if isnothing(h)
-        out = base_fourier(x, [K], 1:length(x), [m])
-        size(out) == (size(x, 1), 2 * K) || throw(ArgumentError("Dimensions are wrong"))
+        X, colnames = base_fourier(x, [K], 1:length(x), [m])
+        size(X, 1) == length(x) || throw(ArgumentError("Row dimension is wrong"))
     else
-        out = base_fourier(x, [K], length(x) .+ (1:h), [m])
-        size(out) == (h, 2 * K) || throw(ArgumentError("Dimensions are wrong"))
+        X, colnames = base_fourier(x, [K], length(x) .+ (1:h), [m])
+        size(X, 1) == h || throw(ArgumentError("Row dimension is wrong"))
     end
-    
-    return out
+
+    keys = Tuple(Symbol.(colnames))
+    vals = Tuple(X[:, j] for j in 1:size(X, 2))
+    return NamedTuple{keys}(vals)
 end

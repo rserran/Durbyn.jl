@@ -384,9 +384,9 @@ const REF_KPSS_STAT_AP = 2.8767
         @testset "Basic Fourier terms" begin
             F = fourier(x; m=m_period, K=2)
 
-            @test size(F, 2) == 4
-            @test size(F, 1) == n
-            @test all(-1.0 .<= F .<= 1.0)
+            @test length(F) == 4
+            @test length(F.S1) == n
+            @test keys(F) == (:S1, :C1, :S2, :C2)
         end
 
         @testset "Fourier with different K values" begin
@@ -395,9 +395,10 @@ const REF_KPSS_STAT_AP = 2.8767
             F3 = fourier(x24; m=12, K=3)
             F6 = fourier(x24; m=12, K=6)
 
-            @test size(F1, 2) == 2
-            @test size(F3, 2) == 6
-            @test size(F6, 2) == 12
+            @test length(F1) == 2
+            @test length(F3) == 6
+            @test length(F6) == 11  # S6 dropped: sin(πt)=0 for integer t
+            @test last(keys(F6)) == :C6
         end
     end
 
@@ -605,16 +606,17 @@ const REF_KPSS_STAT_AP = 2.8767
 
     @testset "Stats Bug Fixes" begin
 
-        @testset "fourier scalar args produce correct matrix" begin
+        @testset "fourier scalar args produce correct NamedTuple" begin
             F = fourier(AirPassengers, m=12, K=6)
-            @test size(F) == (144, 12)
-            @test all(-1.0 .<= F .<= 1.0)
+            @test length(F) == 11  # S6 dropped: sin(πt)=0 for integer t
+            @test length(F.S1) == 144
+            @test all(v -> all(-1.0 .<= v .<= 1.0), values(F))
         end
 
-        @testset "fourier with h produces forecast matrix" begin
+        @testset "fourier with h produces forecast NamedTuple" begin
             Fh = fourier(AirPassengers, m=12, K=6, h=12)
-            @test size(Fh) == (12, 12)
-            @test all(-1.0 .<= Fh .<= 1.0)
+            @test length(Fh) == 11  # S6 dropped
+            @test length(Fh.S1) == 12
         end
 
         @testset "mstl basic decomposition" begin
@@ -694,6 +696,8 @@ const REF_KPSS_STAT_AP = 2.8767
     @testset "R Numerical Parity" begin
 
         @testset "fourier matches R forecast::fourier (K=6, m=12)" begin
+            # R: fourier(ts(AirPassengers, frequency=12), K=6) returns 11 columns
+            # S6 (sin(πt)=0) is dropped, matching R behavior
             R_row1 = [0.5, 0.8660254038, 0.8660254038, 0.5,
                       1.0, 0.0, 0.8660254038, -0.5,
                       0.5, -0.8660254038, -1.0]
@@ -702,11 +706,14 @@ const REF_KPSS_STAT_AP = 2.8767
                       1.0, 0.0, -1.0]
 
             F = fourier(AirPassengers, m=12, K=6)
-            @test size(F, 1) == 144
-            jl_shared = [1,2,3,4,5,6,7,8,9,10,12]
-            @test all(isapprox.(F[1, jl_shared], R_row1, atol=1e-8))
-            @test all(isapprox.(F[3, jl_shared], R_row3, atol=1e-8))
-            @test all(abs.(F[:, 11]) .< 1e-10)
+            @test length(F) == 11
+            jl_row1 = [v[1] for v in values(F)]
+            jl_row3 = [v[3] for v in values(F)]
+            @test all(isapprox.(jl_row1, R_row1, atol=1e-8))
+            @test all(isapprox.(jl_row3, R_row3, atol=1e-8))
+            @test keys(F) == (:S1, :C1, :S2, :C2,
+                              :S3, :C3, :S4, :C4,
+                              :S5, :C5, :C6)
         end
 
         @testset "fourier h=12 matches R forecast::fourier h=12" begin
@@ -718,9 +725,14 @@ const REF_KPSS_STAT_AP = 2.8767
                          0.0, 1.0, 1.0]
 
             Fh = fourier(AirPassengers, m=12, K=6, h=12)
-            jl_shared = [1,2,3,4,5,6,7,8,9,10,12]
-            @test all(isapprox.(Fh[6, jl_shared], R_h_row6, atol=1e-8))
-            @test all(isapprox.(Fh[12, jl_shared], R_h_row12, atol=1e-8))
+            @test length(Fh) == 11
+            jl_h6 = [v[6] for v in values(Fh)]
+            jl_h12 = [v[12] for v in values(Fh)]
+            @test all(isapprox.(jl_h6, R_h_row6, atol=1e-8))
+            @test all(isapprox.(jl_h12, R_h_row12, atol=1e-8))
+            @test keys(Fh) == (:S1, :C1, :S2, :C2,
+                               :S3, :C3, :S4, :C4,
+                               :S5, :C5, :C6)
         end
 
         @testset "BoxCox(AP, λ=0.5) matches R forecast::BoxCox" begin
