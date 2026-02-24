@@ -45,7 +45,7 @@ makedocs(
         ],
         "API Reference" => "api.md",
     ],
-    checkdocs = :none,
+    checkdocs = :exports,
 )
 
 deploydocs(

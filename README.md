@@ -12,7 +12,7 @@
 
 Durbyn — Kurdish for “binoculars” (Dur, far + Byn, to see), embodies foresight through science. Like Hari Seldon’s psychohistory in Asimov’s Foundation, we seek to glimpse the shape of tomorrow through the disciplined clarity of mathematics.
 
-This package is currently under development and will be part of the **TAFS Forecasting Ecosystem**, an open-source initiative.
+This package is part of the **TAFS Forecasting Ecosystem**, an open-source initiative.
 
 ## About TAFS
 
@@ -33,7 +33,10 @@ The Durbyn package is licensed under the **Apache License 2.0**, allowing for op
 
 ## Installation
 
-Durbyn is still in development. Once it is officially released, you will be able to install it using Julia's package manager.
+``` julia
+using Pkg
+Pkg.add("Durbyn")
+```
 
 For the latest development version, you can install directly from GitHub:
 
