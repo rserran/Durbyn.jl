@@ -1,6 +1,6 @@
 name = "Durbyn"
 uuid = "40b042de-e8ce-4d84-a20a-09ad0ba5d568"
-version = "0.0.1"
+version = "0.1.0"
 license = "Apache-2.0"
 authors = ["Time Series Analysis and Forecasting Society <info@taf-society.org> and contributors"]
 
@@ -30,8 +30,7 @@ Tables = "1.12.1"
 julia = "1.11"
 
 [extras]
-Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
 [targets]
-test = ["Test", "Random"]
+test = ["Test"]
