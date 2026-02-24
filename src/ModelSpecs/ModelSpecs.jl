@@ -46,7 +46,7 @@ fc = forecast(fitted, h = 12)
 """
 module ModelSpecs
 
-using ..Grammar: ModelFormula, VarTerm, AutoVarTerm, ArimaOrderTerm, TbatsTerm, ThetaTerm, DiffusionTerm, compile_ets_formula, NaiveTerm, SnaiveTerm, RwTerm
+using ..Grammar: ModelFormula, VarTerm, AutoVarTerm, ArimaOrderTerm, BatsTerm, TbatsTerm, ThetaTerm, DiffusionTerm, compile_ets_formula, NaiveTerm, SnaiveTerm, RwTerm, _extract_single_term
 using ..Utils: Formula
 
 # Import model types for typed struct fields

@@ -121,11 +121,23 @@ function bats(formula::ModelFormula, data; kwargs...)
 
     bats_args = Dict{Symbol, Any}()
 
+    kw = Dict{Symbol, Any}(kwargs)
+
+    # Formula term takes priority; fall back to m from kwargs
     if !isnothing(bats_term.seasonal_periods)
         if bats_term.seasonal_periods isa Int
             m = [bats_term.seasonal_periods]
         else
             m = bats_term.seasonal_periods
+        end
+    elseif haskey(kw, :m)
+        m_kw = pop!(kw, :m)
+        if m_kw isa Int
+            m = [m_kw]
+        elseif !isnothing(m_kw)
+            m = collect(Int, m_kw)
+        else
+            m = nothing
         end
     else
         m = nothing
@@ -147,7 +159,7 @@ function bats(formula::ModelFormula, data; kwargs...)
         bats_args[:use_arma_errors] = bats_term.use_arma_errors
     end
 
-    merge!(bats_args, Dict{Symbol, Any}(kwargs))
+    merge!(bats_args, kw)
 
     return bats(y, m; pairs(bats_args)...)
 end

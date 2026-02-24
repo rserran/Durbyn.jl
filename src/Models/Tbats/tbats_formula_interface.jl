@@ -141,12 +141,24 @@ function tbats(formula::ModelFormula, data; kwargs...)
 
     tbats_args = Dict{Symbol, Any}()
 
+    kw = Dict{Symbol, Any}(kwargs)
+
     # Convert seasonal_periods to the format expected by tbats()
+    # Formula term takes priority; fall back to m from kwargs
     if !isnothing(tbats_term.seasonal_periods)
         if tbats_term.seasonal_periods isa Real
             m = [tbats_term.seasonal_periods]
         else
             m = collect(Float64, tbats_term.seasonal_periods)
+        end
+    elseif haskey(kw, :m)
+        m_kw = pop!(kw, :m)
+        if m_kw isa Real
+            m = [Float64(m_kw)]
+        elseif !isnothing(m_kw)
+            m = collect(Float64, m_kw)
+        else
+            m = nothing
         end
     else
         m = nothing
@@ -177,7 +189,7 @@ function tbats(formula::ModelFormula, data; kwargs...)
         tbats_args[:use_arma_errors] = tbats_term.use_arma_errors
     end
 
-    merge!(tbats_args, Dict{Symbol, Any}(kwargs))
+    merge!(tbats_args, kw)
 
     return tbats(y, m; pairs(tbats_args)...)
 end

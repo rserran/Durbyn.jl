@@ -1268,7 +1268,7 @@ Fit a BATS model specification to data (single series or grouped).
 - `data` - Tables.jl-compatible data (NamedTuple, DataFrame, CSV.File, etc.)
 
 # Keyword Arguments
-- `m::Union{Int, Nothing}=nothing` - Seasonal period (consumed but not used; BATS gets `m` from the formula's `seasonal_periods`/`m` term)
+- `m::Union{Int, Nothing}=nothing` - Seasonal period. Used as fallback when the formula does not specify `seasonal_periods`/`m`; formula takes priority if both are given
 - `groupby::Union{Symbol, Vector{Symbol}, Nothing}` - Column(s) to group by for panel data
 - `parallel::Bool` - Use parallel processing for grouped data (default true)
 - `fail_fast::Bool` - Stop on first error in grouped fitting (default false)
@@ -1313,11 +1313,12 @@ function fit(spec::BatsSpec, data;
              kwargs...)
 
     if !isnothing(groupby)
+        m_kwargs = isnothing(m) ? kwargs : (; m=m, kwargs...)
         return fit_grouped(spec, data;
                            groupby=groupby,
                            parallel=parallel,
                            fail_fast=fail_fast,
-                           kwargs...)
+                           m_kwargs...)
     end
 
     fit_options = merge(spec.options, Dict{Symbol, Any}(kwargs))
@@ -1338,6 +1339,14 @@ function fit(spec::BatsSpec, data;
         throw(ArgumentError(
             "Target variable ':$(target_col)' must be a vector, got $(typeof(target_data))"
         ))
+    end
+
+    # Forward m from fit() kwarg when formula doesn't specify seasonal_periods
+    if !isnothing(m)
+        bats_term = _extract_single_term(spec.formula, BatsTerm)
+        if isnothing(bats_term.seasonal_periods)
+            fit_options[:m] = m
+        end
     end
 
     parent_mod = parentmodule(@__MODULE__)
@@ -1425,7 +1434,7 @@ seasonal periods and efficient handling of very long seasonal cycles.
 - `data` - Tables.jl-compatible data (NamedTuple, DataFrame, CSV.File, etc.)
 
 # Keyword Arguments
-- `m::Union{Int, Nothing}=nothing` - Seasonal period (consumed but not used; TBATS gets `m` from the formula's `seasonal_periods`/`m` term)
+- `m::Union{Int, Nothing}=nothing` - Seasonal period. Used as fallback when the formula does not specify `seasonal_periods`/`m`; formula takes priority if both are given
 - `groupby::Union{Symbol, Vector{Symbol}, Nothing}` - Column(s) to group by for panel data
 - `parallel::Bool` - Use parallel processing for grouped data (default true)
 - `fail_fast::Bool` - Stop on first error in grouped fitting (default false)
@@ -1481,11 +1490,12 @@ function fit(spec::TbatsSpec, data;
              kwargs...)
 
     if !isnothing(groupby)
+        m_kwargs = isnothing(m) ? kwargs : (; m=m, kwargs...)
         return fit_grouped(spec, data;
                            groupby=groupby,
                            parallel=parallel,
                            fail_fast=fail_fast,
-                           kwargs...)
+                           m_kwargs...)
     end
 
     fit_options = merge(spec.options, Dict{Symbol, Any}(kwargs))
@@ -1506,6 +1516,14 @@ function fit(spec::TbatsSpec, data;
         throw(ArgumentError(
             "Target variable ':$(target_col)' must be a vector, got $(typeof(target_data))"
         ))
+    end
+
+    # Forward m from fit() kwarg when formula doesn't specify seasonal_periods
+    if !isnothing(m)
+        tbats_term = _extract_single_term(spec.formula, TbatsTerm)
+        if isnothing(tbats_term.seasonal_periods)
+            fit_options[:m] = m
+        end
     end
 
     parent_mod = parentmodule(@__MODULE__)
