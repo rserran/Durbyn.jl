@@ -1,133 +1,138 @@
 """
     STLResult
 
-Container for the results of an STL decomposition.  The time series
-components are stored in the `time_series` field as a named tuple
-with keys `:seasonal`, `:trend` and `:remainder`.  Additional
-metadata such as the robustness weights, smoothing windows, local
-polynomial degrees, jump parameters and iteration counts are also
-stored.  This struct loosely follows the structure of the list
-returned by the R `stl` function.
+Container for the results of an STL decomposition.  Fields store the
+seasonal, trend and remainder components directly along with the
+robustness weights, smoothing windows, local polynomial degrees, jump
+parameters and iteration counts.
 """
 struct STLResult{T<:Real}
-    time_series::NamedTuple{(:seasonal,:trend,:remainder),Tuple{Vector{T},Vector{T},Vector{T}}}
+    seasonal::Vector{T}
+    trend::Vector{T}
+    remainder::Vector{T}
     weights::Vector{T}
-    windows::NamedTuple{(:s,:t,:l),Tuple{Int,Int,Int}}
-    degrees::NamedTuple{(:s,:t,:l),Tuple{Int,Int,Int}}
-    jumps::NamedTuple{(:s,:t,:l),Tuple{Int,Int,Int}}
-    inner::Int
-    outer::Int
+    seasonal_window::Int
+    trend_window::Int
+    lowpass_window::Int
+    seasonal_degree::Int
+    trend_degree::Int
+    lowpass_degree::Int
+    seasonal_jump::Int
+    trend_jump::Int
+    lowpass_jump::Int
+    inner_iterations::Int
+    outer_iterations::Int
 end
 
-function stlest!(y::AbstractVector{Float64}, n::Int, len::Int, ideg::Int,
-                 xs::Float64, nleft::Int, nright::Int,
-                 w::AbstractVector{Float64}, userw::Bool, rw::AbstractVector{Float64})
-                 
-    range = float(n) - 1.0
-    h = max(xs - float(nleft), float(nright) - xs)
-    if len > n
-        h += float((len - n) ÷ 2)
-    end
-    h9 = 0.999 * h
-    h1 = 0.001 * h
+function loess_estimate!(y::AbstractVector{Float64}, n::Int, bandwidth::Int, degree::Int,
+                         eval_point::Float64, left_bound::Int, right_bound::Int,
+                         w::AbstractVector{Float64}, use_weights::Bool, robustness_weights::AbstractVector{Float64})
 
-    asum = 0.0
-    for j in nleft:nright
-        r = abs(float(j) - xs)
-        if r <= h9
-            if r <= h1 || h == 0.0
+    range = float(n) - 1.0
+    half_width = max(eval_point - float(left_bound), float(right_bound) - eval_point)
+    if bandwidth > n
+        half_width += float((bandwidth - n) ÷ 2)
+    end
+    upper_threshold = 0.999 * half_width
+    lower_threshold = 0.001 * half_width
+
+    weight_sum = 0.0
+    for j in left_bound:right_bound
+        r = abs(float(j) - eval_point)
+        if r <= upper_threshold
+            if r <= lower_threshold || half_width == 0.0
                 w[j] = 1.0
             else
-                rr = r / h
+                rr = r / half_width
                 w[j] = (1.0 - rr^3)^3
             end
-            if userw
-                w[j] *= rw[j]
+            if use_weights
+                w[j] *= robustness_weights[j]
             end
-            asum += w[j]
+            weight_sum += w[j]
         else
             w[j] = 0.0
         end
     end
 
-    if asum <= 0.0
+    if weight_sum <= 0.0
         return 0.0, false
     end
-    
-    inva = 1.0 / asum
-    for j in nleft:nright
-        w[j] *= inva
+
+    inv_weight_sum = 1.0 / weight_sum
+    for j in left_bound:right_bound
+        w[j] *= inv_weight_sum
     end
 
-    if h > 0.0 && ideg > 0
-        
+    if half_width > 0.0 && degree > 0
+
         a_mean = 0.0
-        for j in nleft:nright
+        for j in left_bound:right_bound
             a_mean += w[j] * float(j)
         end
-        b = xs - a_mean
+        b = eval_point - a_mean
         c = 0.0
-        for j in nleft:nright
+        for j in left_bound:right_bound
             d = float(j) - a_mean
             c += w[j] * d^2
         end
-        
+
         if sqrt(c) > 0.001 * range
             b /= c
-            for j in nleft:nright
+            for j in left_bound:right_bound
                 w[j] = w[j] * (b * (float(j) - a_mean) + 1.0)
             end
         end
     end
-    
+
     ys = 0.0
-    for j in nleft:nright
+    for j in left_bound:right_bound
         ys += w[j] * y[j]
     end
     return ys, true
 end
 
-function stless!(y::AbstractVector{Float64}, n::Int, len::Int, ideg::Int, njump::Int,
-                 userw::Bool, rw::AbstractVector{Float64},
-                 ys::AbstractVector{Float64}, res::AbstractVector{Float64})
-                 
+function loess_smooth!(y::AbstractVector{Float64}, n::Int, bandwidth::Int, degree::Int, jump::Int,
+                       use_weights::Bool, robustness_weights::AbstractVector{Float64},
+                       ys::AbstractVector{Float64}, res::AbstractVector{Float64})
+
     if n < 2
-        
+
         ys[firstindex(ys)] = y[1]
         return
     end
-    
-    newnj = min(njump, n - 1)
-    
-    nleft = 1
-    nright = min(len, n)
 
-    if len >= n
-        nleft = 1
-        nright = n
+    new_jump = min(jump, n - 1)
+
+    left_bound = 1
+    right_bound = min(bandwidth, n)
+
+    if bandwidth >= n
+        left_bound = 1
+        right_bound = n
         i = 1
         while i <= n
-            xs = float(i)
-            ysi, ok = stlest!(y, n, len, ideg, xs, nleft, nright, res, userw, rw)
+            eval_point = float(i)
+            ysi, ok = loess_estimate!(y, n, bandwidth, degree, eval_point, left_bound, right_bound, res, use_weights, robustness_weights)
             if ok
                 ys[firstindex(ys) - 1 + i] = ysi
             else
                 ys[firstindex(ys) - 1 + i] = y[i]
             end
-            i += newnj
+            i += new_jump
         end
     else
-        if newnj == 1
-            nsh = (len + 1) ÷ 2
-            nleft = 1
-            nright = len
+        if new_jump == 1
+            half_bandwidth = (bandwidth + 1) ÷ 2
+            left_bound = 1
+            right_bound = bandwidth
             for i in 1:n
-                if (i > nsh) && (nright != n)
-                    nleft += 1
-                    nright += 1
+                if (i > half_bandwidth) && (right_bound != n)
+                    left_bound += 1
+                    right_bound += 1
                 end
-                xs = float(i)
-                ysi, ok = stlest!(y, n, len, ideg, xs, nleft, nright, res, userw, rw)
+                eval_point = float(i)
+                ysi, ok = loess_estimate!(y, n, bandwidth, degree, eval_point, left_bound, right_bound, res, use_weights, robustness_weights)
                 if ok
                     ys[firstindex(ys) - 1 + i] = ysi
                 else
@@ -135,55 +140,55 @@ function stless!(y::AbstractVector{Float64}, n::Int, len::Int, ideg::Int, njump:
                 end
             end
         else
-            nsh = (len + 1) ÷ 2
+            half_bandwidth = (bandwidth + 1) ÷ 2
             i = 1
             while i <= n
-                if i < nsh
-                    nleft = 1
-                    nright = len
-                elseif i >= n - nsh + 1
-                    nleft = n - len + 1
-                    nright = n
+                if i < half_bandwidth
+                    left_bound = 1
+                    right_bound = bandwidth
+                elseif i >= n - half_bandwidth + 1
+                    left_bound = n - bandwidth + 1
+                    right_bound = n
                 else
-                    nleft = i - nsh + 1
-                    nright = len + i - nsh
+                    left_bound = i - half_bandwidth + 1
+                    right_bound = bandwidth + i - half_bandwidth
                 end
-                xs = float(i)
-                ysi, ok = stlest!(y, n, len, ideg, xs, nleft, nright, res, userw, rw)
+                eval_point = float(i)
+                ysi, ok = loess_estimate!(y, n, bandwidth, degree, eval_point, left_bound, right_bound, res, use_weights, robustness_weights)
                 if ok
                     ys[firstindex(ys) - 1 + i] = ysi
                 else
                     ys[firstindex(ys) - 1 + i] = y[i]
                 end
-                i += newnj
+                i += new_jump
             end
         end
     end
 
-    if newnj != 1
+    if new_jump != 1
         i = 1
-        while i <= n - newnj
+        while i <= n - new_jump
             ysi = ys[firstindex(ys) - 1 + i]
-            ysj = ys[firstindex(ys) - 1 + i + newnj]
-            delta = (ysj - ysi) / float(newnj)
-            for j in (i + 1):(i + newnj - 1)
+            ysj = ys[firstindex(ys) - 1 + i + new_jump]
+            delta = (ysj - ysi) / float(new_jump)
+            for j in (i + 1):(i + new_jump - 1)
                 ys[firstindex(ys) - 1 + j] = ysi + delta * float(j - i)
             end
-            i += newnj
+            i += new_jump
         end
-        
-        k = ((n - 1) ÷ newnj) * newnj + 1
+
+        k = ((n - 1) ÷ new_jump) * new_jump + 1
         if k != n
-            
-            xs = float(n)
-            ysn, ok = stlest!(y, n, len, ideg, xs, nleft, nright, res, userw, rw)
+
+            eval_point = float(n)
+            ysn, ok = loess_estimate!(y, n, bandwidth, degree, eval_point, left_bound, right_bound, res, use_weights, robustness_weights)
             if ok
                 ys[firstindex(ys) - 1 + n] = ysn
             else
                 ys[firstindex(ys) - 1 + n] = y[n]
             end
             if k != n - 1
-                
+
                 valk = ys[firstindex(ys) - 1 + k]
                 valn = ys[firstindex(ys) - 1 + n]
                 delta2 = (valn - valk) / float(n - k)
@@ -196,108 +201,108 @@ function stless!(y::AbstractVector{Float64}, n::Int, len::Int, ideg::Int, njump:
     return
 end
 
-function stlma!(x::AbstractVector{Float64}, n::Int, len::Int, ave::AbstractVector{Float64})
-    
-    if len <= 0 || n < len
+function moving_average!(x::AbstractVector{Float64}, n::Int, window::Int, ave::AbstractVector{Float64})
+
+    if window <= 0 || n < window
         return
     end
-    newn = n - len + 1
-    
+    newn = n - window + 1
+
     v = 0.0
-    for i in 1:len
+    for i in 1:window
         v += x[i]
     end
-    flen = float(len)
-    ave[1] = v / flen
+    fwindow = float(window)
+    ave[1] = v / fwindow
     if newn > 1
-        k = len
+        k = window
         m = 0
         for j in 2:newn
             k += 1
             m += 1
             v = v - x[m] + x[k]
-            ave[j] = v / flen
+            ave[j] = v / fwindow
         end
     end
     return
 end
 
-function stlfts!(x::AbstractVector{Float64}, n::Int, np::Int,
-                 trend::AbstractVector{Float64}, work::AbstractVector{Float64})
-                 
-    stlma!(x, n, np, trend)
-    
-    stlma!(trend, n - np + 1, np, work)
-    
-    stlma!(work, n - 2 * np + 2, 3, trend)
+function lowpass_filter!(x::AbstractVector{Float64}, n::Int, period::Int,
+                         trend::AbstractVector{Float64}, work::AbstractVector{Float64})
+
+    moving_average!(x, n, period, trend)
+
+    moving_average!(trend, n - period + 1, period, work)
+
+    moving_average!(work, n - 2 * period + 2, 3, trend)
     return
 end
 
-function stlss!(y::AbstractVector{Float64}, n::Int, np::Int, ns::Int, isdeg::Int,
-                nsjump::Int, userw::Bool, rw::AbstractVector{Float64},
-                season_ext::AbstractVector{Float64},
-                work1::AbstractVector{Float64}, work2::AbstractVector{Float64},
-                work3::AbstractVector{Float64}, work4::AbstractVector{Float64})
-                
-    if np < 1
+function seasonal_smooth!(y::AbstractVector{Float64}, n::Int, period::Int, seasonal_bandwidth::Int, seasonal_degree::Int,
+                           seasonal_jump::Int, use_weights::Bool, robustness_weights::AbstractVector{Float64},
+                           season_ext::AbstractVector{Float64},
+                           work1::AbstractVector{Float64}, work2::AbstractVector{Float64},
+                           work3::AbstractVector{Float64}, work4::AbstractVector{Float64})
+
+    if period < 1
         return
     end
-    
-    for j in 1:np
-        
-        k = ((n - j) ÷ np) + 1
-        
+
+    for j in 1:period
+
+        k = ((n - j) ÷ period) + 1
+
         for i in 1:k
-            idx = (i - 1) * np + j
+            idx = (i - 1) * period + j
             work1[i] = y[idx]
         end
-        
-        if userw
+
+        if use_weights
             for i in 1:k
-                idx = (i - 1) * np + j
-                work3[i] = rw[idx]
+                idx = (i - 1) * period + j
+                work3[i] = robustness_weights[idx]
             end
         end
-        
-        stless!(work1, k, ns, isdeg, nsjump, userw, work3, view(work2, 2:(k + 1)), work4)
-        
-        xs = 0.0
-        nright = min(ns, k)
-        yfit, ok = stlest!(work1, k, ns, isdeg, xs, 1, nright, work4, userw, work3)
+
+        loess_smooth!(work1, k, seasonal_bandwidth, seasonal_degree, seasonal_jump, use_weights, work3, view(work2, 2:(k + 1)), work4)
+
+        eval_point = 0.0
+        right_bound = min(seasonal_bandwidth, k)
+        yfit, ok = loess_estimate!(work1, k, seasonal_bandwidth, seasonal_degree, eval_point, 1, right_bound, work4, use_weights, work3)
         if !ok
             yfit = work2[2]
         end
         work2[1] = yfit
-        
-        xs = float(k + 1)
-        nleft = max(1, k - ns + 1)
-        yfit, ok = stlest!(work1, k, ns, isdeg, xs, nleft, k, work4, userw, work3)
+
+        eval_point = float(k + 1)
+        left_bound = max(1, k - seasonal_bandwidth + 1)
+        yfit, ok = loess_estimate!(work1, k, seasonal_bandwidth, seasonal_degree, eval_point, left_bound, k, work4, use_weights, work3)
         if !ok
             yfit = work2[k + 1]
         end
         work2[k + 2] = yfit
-        
-        for m in 1:(k + 2)
-            idx = (m - 1) * np + j
-            season_ext[idx] = work2[m]
+
+        for idx in 1:(k + 2)
+            pos = (idx - 1) * period + j
+            season_ext[pos] = work2[idx]
         end
     end
     return
 end
 
 
-function stlrwt!(y::AbstractVector{Float64}, fit::AbstractVector{Float64},
-                 rw::AbstractVector{Float64})
+function robustness_weights!(y::AbstractVector{Float64}, fit::AbstractVector{Float64},
+                             rw::AbstractVector{Float64})
     n = min(length(y), length(fit), length(rw))
-    
+
     tmp = Vector{Float64}(undef, n)
     for i in 1:n
         tmp[i] = abs(y[i] - fit[i])
     end
-    
+
     mad = median(tmp)
     cmad = 6.0 * mad
-    
+
     c9 = 0.999 * cmad
     c1 = 0.001 * cmad
     for i in 1:n
@@ -314,105 +319,106 @@ function stlrwt!(y::AbstractVector{Float64}, fit::AbstractVector{Float64},
     return
 end
 
-function stlstp!(y::AbstractVector{Float64}, n::Int, np::Int, ns::Int, nt::Int, nl::Int,
-                 isdeg::Int, itdeg::Int, ildeg::Int,
-                 nsjump::Int, ntjump::Int, nljump::Int,
-                 ni::Int, userw::Bool, rw::AbstractVector{Float64},
-                 season::AbstractVector{Float64}, trend::AbstractVector{Float64})
-                 
-    n2 = n + 2 * np
-    col1 = zeros(Float64, n2)
-    col2 = zeros(Float64, n2)
-    col3 = zeros(Float64, n2)
-    col4 = zeros(Float64, n2)
-    col5 = zeros(Float64, n2)
-    for _iter in 1:ni
-        
+function stl_inner_loop!(y::AbstractVector{Float64}, n::Int, period::Int,
+                         seasonal_bandwidth::Int, trend_bandwidth::Int, lowpass_bandwidth::Int,
+                         seasonal_degree::Int, trend_degree::Int, lowpass_degree::Int,
+                         seasonal_jump::Int, trend_jump::Int, lowpass_jump::Int,
+                         n_inner::Int, use_weights::Bool, robustness_weights::AbstractVector{Float64},
+                         season::AbstractVector{Float64}, trend::AbstractVector{Float64})
+
+    n_extended = n + 2 * period
+    detrended = zeros(Float64, n_extended)
+    seasonal_ext = zeros(Float64, n_extended)
+    lowpass_smoothed = zeros(Float64, n_extended)
+    work_a = zeros(Float64, n_extended)
+    work_b = zeros(Float64, n_extended)
+    for _iter in 1:n_inner
+
         for i in 1:n
-            col1[i] = y[i] - trend[i]
+            detrended[i] = y[i] - trend[i]
         end
-        
-        stlss!(col1, n, np, ns, isdeg, nsjump, userw, rw, col2, col3, col4, col5, season)
-        stlfts!(col2, n2, np, col3, col1)
-        stless!(col3, n, nl, ildeg, nljump, false, col4, col1, col5)
+
+        seasonal_smooth!(detrended, n, period, seasonal_bandwidth, seasonal_degree, seasonal_jump, use_weights, robustness_weights, seasonal_ext, lowpass_smoothed, work_a, work_b, season)
+        lowpass_filter!(seasonal_ext, n_extended, period, lowpass_smoothed, detrended)
+        loess_smooth!(lowpass_smoothed, n, lowpass_bandwidth, lowpass_degree, lowpass_jump, false, work_a, detrended, work_b)
         for i in 1:n
-            season[i] = col2[np + i] - col1[i]
+            season[i] = seasonal_ext[period + i] - detrended[i]
         end
         for i in 1:n
-            col1[i] = y[i] - season[i]
+            detrended[i] = y[i] - season[i]
         end
-        stless!(col1, n, nt, itdeg, ntjump, userw, rw, trend, col3)
+        loess_smooth!(detrended, n, trend_bandwidth, trend_degree, trend_jump, use_weights, robustness_weights, trend, lowpass_smoothed)
     end
     return
 end
 
-function stl_base(
+function stl_outer_loop!(
     y::AbstractVector{Float64},
-    np::Int,
-    ns::Int,
-    nt::Int,
-    nl::Int,
-    isdeg::Int,
-    itdeg::Int,
-    ildeg::Int,
-    nsjump::Int,
-    ntjump::Int,
-    nljump::Int,
-    ni::Int,
-    no::Int,
+    period::Int,
+    seasonal_bandwidth::Int,
+    trend_bandwidth::Int,
+    lowpass_bandwidth::Int,
+    seasonal_degree::Int,
+    trend_degree::Int,
+    lowpass_degree::Int,
+    seasonal_jump::Int,
+    trend_jump::Int,
+    lowpass_jump::Int,
+    n_inner::Int,
+    n_outer::Int,
     rw::AbstractVector{Float64},
     season::AbstractVector{Float64},
     trend::AbstractVector{Float64},
 )
     n = length(y)
     fill!(trend, 0.0)
-    newns = max(3, ns)
-    if newns % 2 == 0
-        newns += 1
+    new_seasonal_bandwidth = max(3, seasonal_bandwidth)
+    if new_seasonal_bandwidth % 2 == 0
+        new_seasonal_bandwidth += 1
     end
-    newnt = max(3, nt)
-    if newnt % 2 == 0
-        newnt += 1
+    new_trend_bandwidth = max(3, trend_bandwidth)
+    if new_trend_bandwidth % 2 == 0
+        new_trend_bandwidth += 1
     end
-    newnl = max(3, nl)
-    if newnl % 2 == 0
-        newnl += 1
+    new_lowpass_bandwidth = max(3, lowpass_bandwidth)
+    if new_lowpass_bandwidth % 2 == 0
+        new_lowpass_bandwidth += 1
     end
-    newnp = max(2, np)
-    userw = false
+    new_period = max(2, period)
+    use_weights = false
     k = 0
     while true
-        stlstp!(
+        stl_inner_loop!(
             y,
             n,
-            newnp,
-            newns,
-            newnt,
-            newnl,
-            isdeg,
-            itdeg,
-            ildeg,
-            nsjump,
-            ntjump,
-            nljump,
-            ni,
-            userw,
+            new_period,
+            new_seasonal_bandwidth,
+            new_trend_bandwidth,
+            new_lowpass_bandwidth,
+            seasonal_degree,
+            trend_degree,
+            lowpass_degree,
+            seasonal_jump,
+            trend_jump,
+            lowpass_jump,
+            n_inner,
+            use_weights,
             rw,
             season,
             trend,
         )
         k += 1
-        if k > no
+        if k > n_outer
             break
         end
         fit = Vector{Float64}(undef, n)
         for i = 1:n
             fit[i] = trend[i] + season[i]
         end
-        stlrwt!(y, fit, rw)
-        userw = true
+        robustness_weights!(y, fit, rw)
+        use_weights = true
     end
-    if no <= 0
+    if n_outer <= 0
         for i = 1:n
             rw[i] = 1.0
         end
@@ -420,39 +426,39 @@ function stl_base(
     return
 end
 
-function stl_core(
+function stl_decompose(
     y::AbstractVector{Float64},
-    np::Int,
-    ns::Int,
-    nt::Int,
-    nl::Int,
-    isdeg::Int,
-    itdeg::Int,
-    ildeg::Int,
-    nsjump::Int,
-    ntjump::Int,
-    nljump::Int,
-    ni::Int,
-    no::Int,
+    period::Int,
+    seasonal_bandwidth::Int,
+    trend_bandwidth::Int,
+    lowpass_bandwidth::Int,
+    seasonal_degree::Int,
+    trend_degree::Int,
+    lowpass_degree::Int,
+    seasonal_jump::Int,
+    trend_jump::Int,
+    lowpass_jump::Int,
+    n_inner::Int,
+    n_outer::Int,
 )
     n = length(y)
     season = zeros(Float64, n)
     trend = zeros(Float64, n)
     rw = zeros(Float64, n)
-    stl_base(
+    stl_outer_loop!(
         y,
-        np,
-        ns,
-        nt,
-        nl,
-        isdeg,
-        itdeg,
-        ildeg,
-        nsjump,
-        ntjump,
-        nljump,
-        ni,
-        no,
+        period,
+        seasonal_bandwidth,
+        trend_bandwidth,
+        lowpass_bandwidth,
+        seasonal_degree,
+        trend_degree,
+        lowpass_degree,
+        seasonal_jump,
+        trend_jump,
+        lowpass_jump,
+        n_inner,
+        n_outer,
         rw,
         season,
         trend,
@@ -460,12 +466,7 @@ function stl_core(
     return season, trend, rw
 end
 
-function nextodd(x::Real)::Int
-    cx = Int(round(x))
-    return isodd(cx) ? cx : cx + 1
-end
-
-function check_degree(deg, name::AbstractString)
+function _validate_degree(deg, name::AbstractString)
     d = Int(deg)
     if d < 0 || d > 1
         throw(ArgumentError("$name must be 0 or 1"))
@@ -478,60 +479,76 @@ end
 """
     stl(x, m; kwargs...)
 
-High level interface for performing a seasonal-trend decomposition
-based on Loess (STL) on the one-dimensional array `x`.  The
-argument `m` specifies the frequency of the series (the number of
-observations per cycle) and must be at least two.  The function
-closely mirrors the R `stl` API and offers a range of keyword
-arguments controlling the smoothing spans, polynomial degrees,
-subsampling steps and robustness iterations.
+Seasonal-trend decomposition based on Loess (STL).
 
-Mandatory arguments:
+Decomposes the one-dimensional numeric array `x` into **seasonal**,
+**trend** and **remainder** components.  `m` specifies the seasonal
+period (number of observations per cycle) and must be at least two.
+
+# References
+
+R. B. Cleveland, W. S. Cleveland, J. E. McRae, and I. Terpenning (1990)
+*STL: A Seasonal-Trend Decomposition Procedure Based on Loess.*
+Journal of Official Statistics, 6, 3--73.
+
+# Arguments
 
 * `x`: A numeric vector containing the time series to be decomposed.
-* `m` :An integer specifying the frequency (periodicity) of the series.
+* `m`: An integer specifying the frequency (periodicity) of the series.
 
-Keyword arguments (defaults follow the R implementation):
+# Keyword arguments
 
-* `s_window` : Span of the seasonal smoothing window.  May be an integer
-  (interpreted as a span and rounded to the next odd value) or the
-  string `"periodic"` to request a periodic seasonal component.
-* `s_degree` : Degree of the local polynomial used for seasonal
+Defaults follow the R `stl` implementation.
+
+* `seasonal_window`: Span of the seasonal smoothing window.  May be an
+  integer (interpreted as a span and rounded to the nearest odd value) or
+  the symbol `:periodic` to request a periodic seasonal component.
+  Defaults to `:periodic`.
+* `seasonal_degree`: Degree of the local polynomial used for seasonal
   smoothing (0 or 1).  Defaults to 0.
-* `t_window` : Span of the trend smoothing window.  If omitted, a
-  default based on `m` and `s_window` is computed.  Must be odd.
-* `t_degree` : Degree of the local polynomial used for trend
+* `trend_window`: Span of the trend smoothing window.  If omitted, a
+  default based on `m` and `seasonal_window` is computed.  Must be odd.
+* `trend_degree`: Degree of the local polynomial used for trend
   smoothing (0 or 1).  Defaults to 1.
-* `l_window` : Span of the low-pass filter.  Defaults to the next
+* `lowpass_window`: Span of the low-pass filter.  Defaults to the nearest
   odd integer greater than or equal to `m`.
-* `l_degree` : Degree of the local polynomial used for the low-pass
-  filter.  Defaults to the value of `t_degree`.
-* `s_jump`, `t_jump`, `l_jump` : Subsampling step sizes used when
-  evaluating the loess smoother.  Defaults are one tenth of the
-  corresponding window lengths (rounded up).
-* `robust` : Logical flag indicating whether to compute robustness
+* `lowpass_degree`: Degree of the local polynomial used for the low-pass
+  filter.  Defaults to the value of `trend_degree`.
+* `seasonal_jump`, `trend_jump`, `lowpass_jump`: Subsampling step sizes
+  used when evaluating the loess smoother.  Defaults are one tenth of
+  the corresponding window lengths (rounded up).
+* `robust`: Logical flag indicating whether to compute robustness
   weights.  When true up to 15 outer iterations are performed; when
   false no robustness iterations are used.
-* `inner` : Number of inner loop iterations.  Defaults to 1 when
+* `inner`: Number of inner loop iterations.  Defaults to 1 when
   `robust` is true and 2 otherwise.
-* `outer` : Number of outer robustness iterations.  Defaults to 15
+* `outer`: Number of outer robustness iterations.  Defaults to 15
   when `robust` is true and 0 otherwise.
 
-The function returns an `STLResult` containing the seasonal,
-trend and remainder components along with ancillary information.
+# Returns
+
+An [`STLResult`](@ref) containing the seasonal, trend and remainder
+components along with ancillary information.
+
+# Examples
+```julia
+res = stl(AirPassengers, 12)                          # periodic seasonal
+res = stl(AirPassengers, 12; seasonal_window=7)       # fixed window
+res = stl(AirPassengers, 12; robust=true)             # robust fitting
+```
 """
 function stl(
     x::AbstractVector{T},
     m::Integer;
-    s_window,
-    s_degree::Integer = 0,
-    t_window::Union{Nothing,Integer} = nothing,
-    t_degree::Integer = 1,
-    l_window::Union{Nothing,Integer} = nothing,
-    l_degree::Integer = t_degree,
-    s_jump::Union{Nothing,Integer} = nothing,
-    t_jump::Union{Nothing,Integer} = nothing,
-    l_jump::Union{Nothing,Integer} = nothing,
+    seasonal_window::Union{Int,Symbol} = :periodic,
+    seasonal_degree::Integer = 0,
+    trend_window::Union{Nothing,Integer} = nothing,
+    trend_degree::Integer = 1,
+    lowpass_window::Union{Nothing,Integer} = nothing,
+    lowpass_degree::Integer = trend_degree,
+    seasonal_jump::Union{Nothing,Integer} = nothing,
+    trend_jump::Union{Nothing,Integer} = nothing,
+    lowpass_jump::Union{Nothing,Integer} = nothing,
     robust::Bool = false,
     inner::Union{Nothing,Integer} = nothing,
     outer::Union{Nothing,Integer} = nothing,
@@ -549,52 +566,50 @@ function stl(
     end
 
     periodic = false
-    if isa(s_window, AbstractString) || isa(s_window, Symbol)
-
-        sval = String(s_window)
-        if startswith(lowercase(sval), "periodic")
+    if isa(seasonal_window, Symbol)
+        if seasonal_window === :periodic
             periodic = true
-            s_window_val = 10 * n + 1
-            s_degree = 0
+            seasonal_window_val = 10 * n + 1
+            seasonal_degree = 0
         else
-            throw(ArgumentError("unknown string value for s_window: $s_window"))
+            throw(ArgumentError("unknown symbol value for seasonal_window: $seasonal_window"))
         end
-    elseif isa(s_window, Integer)
-        s_window_val = nextodd(s_window)
+    elseif isa(seasonal_window, Integer)
+        seasonal_window_val = nearest_odd(seasonal_window)
     else
-        s_window_val = nextodd(round(Int, s_window))
+        seasonal_window_val = nearest_odd(round(Int, seasonal_window))
     end
 
-    s_degree = check_degree(s_degree, "s_degree")
-    t_degree = check_degree(t_degree, "t_degree")
-    l_degree = check_degree(l_degree, "l_degree")
+    seasonal_degree = _validate_degree(seasonal_degree, "seasonal_degree")
+    trend_degree = _validate_degree(trend_degree, "trend_degree")
+    lowpass_degree = _validate_degree(lowpass_degree, "lowpass_degree")
 
-    if isnothing(t_window)
-        t_window_val = nextodd(ceil(Int, 1.5 * m / (1.0 - 1.5 / s_window_val)))
+    if isnothing(trend_window)
+        trend_window_val = nearest_odd(ceil(Int, 1.5 * m / (1.0 - 1.5 / seasonal_window_val)))
     else
-        t_window_val = nextodd(t_window)
-    end
-
-    if isnothing(l_window)
-        l_window_val = nextodd(m)
-    else
-        l_window_val = nextodd(l_window)
+        trend_window_val = nearest_odd(trend_window)
     end
 
-    if isnothing(s_jump)
-        s_jump_val = max(1, Int(ceil(s_window_val / 10)))
+    if isnothing(lowpass_window)
+        lowpass_window_val = nearest_odd(m)
     else
-        s_jump_val = s_jump
+        lowpass_window_val = nearest_odd(lowpass_window)
     end
-    if isnothing(t_jump)
-        t_jump_val = max(1, Int(ceil(t_window_val / 10)))
+
+    if isnothing(seasonal_jump)
+        seasonal_jump_val = max(1, Int(ceil(seasonal_window_val / 10)))
     else
-        t_jump_val = t_jump
+        seasonal_jump_val = seasonal_jump
     end
-    if isnothing(l_jump)
-        l_jump_val = max(1, Int(ceil(l_window_val / 10)))
+    if isnothing(trend_jump)
+        trend_jump_val = max(1, Int(ceil(trend_window_val / 10)))
     else
-        l_jump_val = l_jump
+        trend_jump_val = trend_jump
+    end
+    if isnothing(lowpass_jump)
+        lowpass_jump_val = max(1, Int(ceil(lowpass_window_val / 10)))
+    else
+        lowpass_jump_val = lowpass_jump
     end
 
     if isnothing(inner)
@@ -610,18 +625,18 @@ function stl(
 
     xvec = collect(float.(x))
 
-    season, trend, weights = stl_core(
+    season, trend, weights = stl_decompose(
         xvec,
         m,
-        s_window_val,
-        t_window_val,
-        l_window_val,
-        s_degree,
-        t_degree,
-        l_degree,
-        s_jump_val,
-        t_jump_val,
-        l_jump_val,
+        seasonal_window_val,
+        trend_window_val,
+        lowpass_window_val,
+        seasonal_degree,
+        trend_degree,
+        lowpass_degree,
+        seasonal_jump_val,
+        trend_jump_val,
+        lowpass_jump_val,
         inner_val,
         outer_val,
     )
@@ -647,11 +662,19 @@ function stl(
         remainder = xvec .- season .- trend
     end
     return STLResult{Float64}(
-        (seasonal = season, trend = trend, remainder = remainder),
+        season,
+        trend,
+        remainder,
         weights,
-        (s = s_window_val, t = t_window_val, l = l_window_val),
-        (s = s_degree, t = t_degree, l = l_degree),
-        (s = s_jump_val, t = t_jump_val, l = l_jump_val),
+        seasonal_window_val,
+        trend_window_val,
+        lowpass_window_val,
+        seasonal_degree,
+        trend_degree,
+        lowpass_degree,
+        seasonal_jump_val,
+        trend_jump_val,
+        lowpass_jump_val,
         inner_val,
         outer_val,
     )
@@ -661,44 +684,35 @@ end
 """
     Base.show(io::IO, result::STLResult)
 
-Pretty print an `STLResult`.  The time series components are
-displayed along with basic metadata.  This mimics the behaviour of
-the R `print.stl` method.  The `show` function is invoked
-automatically when a result is printed at the REPL.
+Pretty print an `STLResult`.
 """
 function Base.show(io::IO, result::STLResult)
-    ts = result.time_series
     println(io, "STL decomposition")
-    println(io, "Seasonal component (first 10 values): ", ts.seasonal[1:min(end,10)])
-    println(io, "Trend component    (first 10 values): ", ts.trend[1:min(end,10)])
-    println(io, "Remainder          (first 10 values): ", ts.remainder[1:min(end,10)])
-    println(io, "Windows: ", result.windows)
-    println(io, "Degrees: ", result.degrees)
-    println(io, "Jumps: ", result.jumps)
-    println(io, "Inner iterations: ", result.inner, ", Outer iterations: ", result.outer)
+    println(io, "Seasonal component (first 10 values): ", result.seasonal[1:min(end,10)])
+    println(io, "Trend component    (first 10 values): ", result.trend[1:min(end,10)])
+    println(io, "Remainder          (first 10 values): ", result.remainder[1:min(end,10)])
+    println(io, "Windows: seasonal=", result.seasonal_window, ", trend=", result.trend_window, ", lowpass=", result.lowpass_window)
+    println(io, "Degrees: seasonal=", result.seasonal_degree, ", trend=", result.trend_degree, ", lowpass=", result.lowpass_degree)
+    println(io, "Jumps: seasonal=", result.seasonal_jump, ", trend=", result.trend_jump, ", lowpass=", result.lowpass_jump)
+    println(io, "Inner iterations: ", result.inner_iterations, ", Outer iterations: ", result.outer_iterations)
     return
 end
 
 """
     summary(result::STLResult; digits=4)
 
-Display a statistical summary of an `STLResult`.  The summary includes
-simple descriptive statistics of the time series components (mean,
-standard deviation, minimum, maximum and interquartile range), the
-IQR expressed as a percentage of the reconstructed data, and a
-summary of the robustness weights.  
+Display a statistical summary of an `STLResult`.
 """
 function summary(result::STLResult; digits::Integer=4)
-    ts = result.time_series
-    n = length(ts.seasonal)
-    data = ts.seasonal .+ ts.trend .+ ts.remainder
+    n = length(result.seasonal)
+    data = result.seasonal .+ result.trend .+ result.remainder
     comps = Dict(
-        :seasonal => ts.seasonal,
-        :trend    => ts.trend,
-        :remainder=> ts.remainder,
+        :seasonal => result.seasonal,
+        :trend    => result.trend,
+        :remainder=> result.remainder,
         :data     => data,
     )
-    
+
     function iqr(v::AbstractVector)
         q25, q75 = quantile(v, [0.25, 0.75])
         return q75 - q25
@@ -712,7 +726,7 @@ function summary(result::STLResult; digits::Integer=4)
         mn = minimum(vec)
         mx = maximum(vec)
         iqr_v = iqr(vec)
-        
+
         component_fmt = string("% .", digits, "f")
         full_fmt = "    mean=" * component_fmt * "  sd=" * component_fmt *
                    "  min=" * component_fmt * "  max=" * component_fmt *
@@ -728,7 +742,7 @@ function summary(result::STLResult; digits::Integer=4)
         pct_str = isnan(pct) ? "NaN" : string(round(pct; digits=1))
         println("  ", Symbol(name), ": ", pct_str, "%")
     end
-    
+
     if all(w -> w == 1.0, result.weights)
         println("Weights: all equal to 1")
     else
@@ -747,8 +761,10 @@ function summary(result::STLResult; digits::Integer=4)
         println("  mean=", s_mean, "  sd=", s_sd,
                 "  min=", s_min, "  max=", s_max, "  IQR=", s_iqr)
     end
-    println("Other components: windows=", result.windows, ", degrees=", result.degrees, ", jumps=", result.jumps,
-            ", inner=", result.inner, ", outer=", result.outer)
+    println("Other components: seasonal_window=", result.seasonal_window,
+            ", trend_window=", result.trend_window,
+            ", lowpass_window=", result.lowpass_window,
+            ", inner=", result.inner_iterations,
+            ", outer=", result.outer_iterations)
     return nothing
 end
-

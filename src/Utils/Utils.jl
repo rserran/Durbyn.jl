@@ -8,6 +8,7 @@ export Formula, parse_formula, compile, model_matrix, model_frame, as_vector
 export air_passengers, ausbeer, lynx, sunspots, pedestrian_counts, simulate_seasonal_data
 export completecases
 export head, tail
+export nearest_odd
 include("named_matrix.jl")
 include("model_frame.jl")
 include("math.jl")

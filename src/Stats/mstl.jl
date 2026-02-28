@@ -7,8 +7,8 @@ Result of a multi-seasonal STL decomposition (`mstl`).
 - `data::Vector{T}`: Original input series (on the **original scale**; i.e., before any Box-Cox transform).
 - `trend::Vector{T}`: Trend component (taken from the **last STL fit**).
 - `seasonals::Vector{Vector{T}}`: Seasonal components; one vector per seasonal
-  period, ordered to match `periods`.
-- `periods::Vector{Int}`: Seasonal periods actually used (after dropping periods
+  period, ordered to match `m`.
+- `m::Vector{Int}`: Seasonal periods actually used (after dropping periods
   with < 2 full cycles).
 - `remainder::Vector{T}`: Remainder (`data - trend - sum(seasonals)` on the
   transformed scale if `lambda` was given, then reported on the same scale as `data` if
@@ -32,78 +32,88 @@ struct MSTLResult{T<:Real}
     lambda::Union{Nothing,Float64}
 end
 
+"""
+    smooth_trend(x) -> Vector{Float64}
+
+Estimate a smooth trend via a centered moving average whose window
+width adapts to the length of `x`.
+"""
 function smooth_trend(x::AbstractVector{<:Real})
     n = length(x)
-    w = max(3, min(n, Int(clamp(round(n ÷ 10), 5, 101))))
-    k = (w - 1) ÷ 2
-    cumsums = vcat(0.0, cumsum(Float64.(x)))
-    y = similar(x, Float64)
+    window_width = max(3, min(n, Int(clamp(round(n ÷ 10), 5, 101))))
+    half_window = (window_width - 1) ÷ 2
+    cumulative_sums = vcat(0.0, cumsum(Float64.(x)))
+    smoothed = similar(x, Float64)
     @inbounds for t in 1:n
-        a = max(1, t - k); b = min(n, t + k)
-        y[t] = (cumsums[b+1] - cumsums[a]) / (b - a + 1)
+        left = max(1, t - half_window)
+        right = min(n, t + half_window)
+        smoothed[t] = (cumulative_sums[right + 1] - cumulative_sums[left]) / (right - left + 1)
     end
-    return y
+    return smoothed
 end
 
 """
-    mstl(x::AbstractVector{T};
-         periods::Union{Integer,AbstractVector{<:Integer}} = 1,
-         lambda::Union{Nothing,Real}=nothing,
-         iterate::Integer=2,
-         s_window=nothing,
-         stl_kwargs...) where {T<:Real}
+    mstl(x, m; kwargs...)
 
-Multiple seasonal decomposition.
+Multiple seasonal decomposition by iterative STL.
 
 Decomposes a univariate time series into **seasonal**, **trend**, and **remainder**
-components. Seasonal components are estimated **iteratively** using `stl` with one
-seasonal period at a time; **multiple seasonal periods are allowed**. The **trend**
-component is taken from the **last STL fit** in the final iteration. If no valid
-seasonal period remains, the series is decomposed into **trend + remainder** only
-(the trend is estimated using a simple smoother).
+components. Seasonal components are estimated **iteratively** using [`stl`](@ref)
+with one seasonal period at a time; **multiple seasonal periods are allowed**.
+The **trend** component is taken from the **last STL fit** in the final iteration.
+If no valid seasonal period remains, the series is decomposed into
+**trend + remainder** only (the trend is estimated using a simple smoother).
 
 Optionally, a **Box-Cox** transform can be applied to the series prior to
 decomposition.
 
+# References
+
+R. J. Hyndman and G. Athanasopoulos (2021)
+*Forecasting: Principles and Practice* (3rd ed).
+OTexts, Melbourne. <https://otexts.com/fpp3/>
+
 # Arguments
 - `x`: Univariate time series (`AbstractVector{<:Real}`).
-- `m`: A single seasonal period (Int) or a vector of periods. Periods with
+- `m`: A single seasonal period (`Int`) or a vector of periods.  Periods with
   fewer than **two complete cycles** in `x` are **dropped** automatically.
-- `lambda`: Optional Box-Cox λ. If provided, the decomposition is performed on the
-  transformed series. (`λ = 0` corresponds to log transform.)
-- `iterate`: Number of **outer iterations** cycling over seasonal periods to refine
-  seasonal estimates (default `2`).
-- `s_window`: Seasonal LOESS window(s). If a scalar, the same value is used for all
-  seasonal components. If a vector, it is recycled or trimmed to match the number
-  of periods. When `nothing`, a default sequence similar to R
+- `lambda`: Optional Box-Cox λ.  If provided, the decomposition is performed on
+  the transformed series.  (`λ = 0` corresponds to log transform.)
+- `iterate`: Number of **outer iterations** cycling over seasonal periods to
+  refine seasonal estimates (default `2`).
+- `seasonal_window`: Seasonal LOESS window(s).  If a scalar, the same value is
+  used for all seasonal components.  If a vector, it is recycled or trimmed to
+  match the number of periods.  When `nothing`, a default sequence similar to R
   (`11, 15, 19, 23, 27, 31`) is used and repeated as needed.
-- `stl_kwargs...`: Additional keyword arguments forwarded to `stl` (e.g.
-  `s_degree`, `t_window`, `t_degree`, `l_window`, `robust`, `inner`, `outer`, etc.).
+- `stl_kwargs...`: Additional keyword arguments forwarded to [`stl`](@ref)
+  (e.g. `seasonal_degree`, `trend_window`, `trend_degree`, `lowpass_window`,
+  `robust`, `inner`, `outer`, etc.).
 
 # Details
 - **Missing values**: any internal missing/NaN values are interpolated before
   decomposition.
-- **Seasonal refinement**: for each iteration and each period `m`, the current
-  estimate of that seasonal component is **added back**, STL is run with frequency
-  `m`, the seasonal is updated, then **removed**—repeating for all periods.
-- **Trend**: the final trend is copied from the **last** STL model fitted in the
-  final iteration.
-- **No seasonality**: if all candidate periods are dropped (or `periods == 1`),
-  the trend is computed by a simple smoother (analogous to R’s `supsmu` fallback).
+- **Seasonal refinement**: for each iteration and each period, the current
+  estimate of that seasonal component is **added back**, STL is run with the
+  given frequency, the seasonal is updated, then **removed** — repeating for
+  all periods.
+- **Trend**: the final trend is copied from the **last** STL model fitted in
+  the final iteration.
+- **No seasonality**: if all candidate periods are dropped (or `m == 1`),
+  the trend is computed by a simple smoother (analogous to R's `supsmu` fallback).
 
 # Returns
 An [`MSTLResult`](@ref) containing:
 - `data`: original (untransformed) data,
 - `trend`: trend component,
 - `seasonals`: a vector of seasonal components (one per period, in ascending order),
-- `periods`: the seasonal periods actually used,
+- `m`: the seasonal periods actually used,
 - `remainder`: residual component,
 - `lambda`: the Box-Cox λ used (or `nothing`).
 
 # Examples
 ```julia
 y = rand(200) .+ 2sin.(2π*(1:200)/7) .+ 0.5sin.(2π*(1:200)/30)
-res = mstl(y; m=[7,30], iterate=2, s_window=[11,23], robust=true)
+res = mstl(y, [7, 30]; iterate=2, seasonal_window=[11, 23], robust=true)
 ```
 
 """
@@ -112,73 +122,72 @@ function mstl(
     m::Union{Integer,AbstractVector{<:Integer}};
     lambda::Union{Nothing,Real, Symbol} = nothing,
     iterate::Integer = 2,
-    s_window = nothing,
+    seasonal_window = nothing,
     stl_kwargs...,
 )
 
     n = length(x)
     n > 0 || throw(ArgumentError("x must be non-empty"))
 
-    orig = Vector{Float64}([ismissing(v) ? NaN : Float64(v) for v in x])
-    xu   = copy(orig)
+    original = Vector{Float64}([ismissing(v) ? NaN : Float64(v) for v in x])
+    transformed = copy(original)
 
-    if any(isnan, xu)
-        interp_m = isa(m, Integer) ? Int(m) : Int(floor(maximum(m)))
-        xu = interpolate_missing(xu; m=interp_m)
+    if any(isnan, transformed)
+        max_period = isa(m, Integer) ? Int(m) : Int(floor(maximum(m)))
+        transformed = interpolate_missing(transformed; m=max_period)
     end
 
     λ = lambda
     if !isnothing(lambda)
-        bc_m = isa(m, Integer) ? Int(m) : maximum(Int.(m))
-        xu, λ = box_cox(xu, bc_m; lambda = λ)
+        max_period = isa(m, Integer) ? Int(m) : maximum(Int.(m))
+        transformed, λ = box_cox(transformed, max_period; lambda = λ)
     end
 
-    pers = isa(m, Integer) ? [Int(m)] : sort(collect(Int.(m)))
-    pers = [p for p in pers if p > 1 && 2 * p < n]
-    
-    if isempty(pers)
-        trend = smooth_trend(xu)
-        rem   = xu .- trend
+    periods = isa(m, Integer) ? [Int(m)] : sort(collect(Int.(m)))
+    periods = [p for p in periods if p > 1 && 2 * p < n]
+
+    if isempty(periods)
+        trend = smooth_trend(transformed)
+        remainder = transformed .- trend
         return MSTLResult{Float64}(
-            orig, trend, Vector{Vector{Float64}}(), Int[], rem, λ
+            original, trend, Vector{Vector{Float64}}(), Int[], remainder, λ
         )
     end
 
     default_windows = collect(11:4:31)
-    swin = if isnothing(s_window)
-        [default_windows[mod1(i, length(default_windows))] for i in 1:length(pers)]
-    elseif isa(s_window, Integer)
-        fill(Int(s_window), length(pers))
+    seasonal_windows = if isnothing(seasonal_window)
+        [default_windows[mod1(i, length(default_windows))] for i in 1:length(periods)]
+    elseif isa(seasonal_window, Integer)
+        fill(Int(seasonal_window), length(periods))
     else
-        v = collect(Int.(s_window))
-        !isempty(v) || throw(ArgumentError("s_window cannot be empty."))
-        [v[mod1(i, length(v))] for i in 1:length(pers)]
+        window_vec = collect(Int.(seasonal_window))
+        !isempty(window_vec) || throw(ArgumentError("seasonal_window cannot be empty."))
+        [window_vec[mod1(i, length(window_vec))] for i in 1:length(periods)]
     end
 
-    seas = [zeros(Float64, n) for _ in pers]
-    deseas = copy(xu)
-    iters = max(1, Int(iterate))
+    seasonals = [zeros(Float64, n) for _ in periods]
+    deseasonalized = copy(transformed)
+    n_iterations = max(1, Int(iterate))
 
-    last_fit = nothing
-    for _ in 1:iters
-        for (idx, m) in pairs(pers)
-            deseas .+= seas[idx]
-            fit = stl(deseas, m; s_window = swin[idx], stl_kwargs...)
-            s   = fit.time_series.seasonal
-            seas[idx] = collect(Float64.(s))
-            deseas .-= seas[idx]
-            last_fit = fit
+    last_stl_fit = nothing
+    for _ in 1:n_iterations
+        for (idx, period) in pairs(periods)
+            deseasonalized .+= seasonals[idx]
+            stl_fit = stl(deseasonalized, period; seasonal_window = seasonal_windows[idx], stl_kwargs...)
+            seasonals[idx] = collect(Float64.(stl_fit.seasonal))
+            deseasonalized .-= seasonals[idx]
+            last_stl_fit = stl_fit
         end
     end
 
-    trend = collect(Float64.(last_fit.time_series.trend))
-    remainder = xu .- trend
-    for s in seas
-        remainder .-= s
+    trend = collect(Float64.(last_stl_fit.trend))
+    remainder = transformed .- trend
+    for seasonal_component in seasonals
+        remainder .-= seasonal_component
     end
 
     return MSTLResult{Float64}(
-        orig, trend, seas, pers, remainder, λ)
+        original, trend, seasonals, periods, remainder, λ)
 end
 
 """
@@ -189,7 +198,7 @@ basic metadata such as seasonal periods and optional Box-Cox λ.
 """
 function Base.show(io::IO, res::MSTLResult)
     n = length(res.data)
-    k = min(n, 10)
+    preview = min(n, 10)
     println(io, "MSTL decomposition")
     println(io, "  length: ", n)
     if isempty(res.m)
@@ -199,16 +208,15 @@ function Base.show(io::IO, res::MSTLResult)
     end
     println(io, "  lambda: ", isnothing(res.lambda) ? "nothing" : string(res.lambda))
 
-    println(io, "Trend     (first $k): ", res.trend[1:k])
+    println(io, "Trend     (first $preview): ", res.trend[1:preview])
     if !isempty(res.seasonals)
-        for (i, p) in enumerate(res.m)
-            s = res.seasonals[i]
-            println(io, "Seasonal($p) (first $k): ", s[1:k])
+        for (i, period) in enumerate(res.m)
+            println(io, "Seasonal($period) (first $preview): ", res.seasonals[i][1:preview])
         end
     else
         println(io, "Seasonal: (none)")
     end
-    println(io, "Remainder (first $k): ", res.remainder[1:k])
+    println(io, "Remainder (first $preview): ", res.remainder[1:preview])
     return
 end
 
@@ -228,20 +236,20 @@ Reports mean, sd, min, max, IQR for:
 Also reports each component's IQR as a percentage of the data IQR.
 """
 function summary(res::MSTLResult; digits::Integer=4)
-    S = isempty(res.seasonals) ? zeros(eltype(res.data), length(res.data)) :
-                                 reduce(+, res.seasonals)
-    data = res.trend .+ S .+ res.remainder
+    total_seasonal = isempty(res.seasonals) ? zeros(eltype(res.data), length(res.data)) :
+                                              reduce(+, res.seasonals)
+    reconstructed = res.trend .+ total_seasonal .+ res.remainder
 
     comps = Dict{Symbol,AbstractVector{<:Real}}(
-        :data      => data,
+        :data      => reconstructed,
         :trend     => res.trend,
         :remainder => res.remainder,
     )
 
     if !isempty(res.seasonals)
-        comps[:seasonal_total] = S
-        for (i, p) in enumerate(res.m)
-            comps[Symbol("seasonal_$p")] = res.seasonals[i]
+        comps[:seasonal_total] = total_seasonal
+        for (i, period) in enumerate(res.m)
+            comps[Symbol("seasonal_$period")] = res.seasonals[i]
         end
     end
 
@@ -255,20 +263,16 @@ function summary(res::MSTLResult; digits::Integer=4)
     fmt(x) = isnan(x) ? "NaN" : string(round(x; digits=digits))
 
     for (name, vec) in sort(collect(comps); by=first)
-        mv, sv = mean(vec), std(vec)
-        mn, mx = minimum(vec), maximum(vec)
-        iq = iqr(vec)
         println("  ", rpad(string(name), 16), " ",
-                "mean=", fmt(mv), "  sd=", fmt(sv),
-                "  min=", fmt(mn), "  max=", fmt(mx),
-                "  IQR=", fmt(iq))
+                "mean=", fmt(mean(vec)), "  sd=", fmt(std(vec)),
+                "  min=", fmt(minimum(vec)), "  max=", fmt(maximum(vec)),
+                "  IQR=", fmt(iqr(vec)))
     end
 
     println("IQR as % of data IQR:")
     data_iqr = iqr(comps[:data])
     for (name, vec) in sort(collect(comps); by=first)
-        iq = iqr(vec)
-        pct = iszero(data_iqr) ? NaN : 100 * iq / data_iqr
+        pct = iszero(data_iqr) ? NaN : 100 * iqr(vec) / data_iqr
         println("  ", rpad(string(name), 16), " ", fmt(pct), "%")
     end
 

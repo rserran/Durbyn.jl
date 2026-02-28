@@ -262,3 +262,15 @@ function col_sums(M::AbstractMatrix{<:Real})
     end
     out
 end
+
+"""
+    nearest_odd(x::Real) -> Int
+
+Round `x` to the nearest integer, then bump up by one if the result is
+even, guaranteeing an odd return value.  Used for smoothing window
+widths that must be odd (e.g. in STL / LOESS).
+"""
+function nearest_odd(x::Real)::Int
+    cx = Int(round(x))
+    return isodd(cx) ? cx : cx + 1
+end

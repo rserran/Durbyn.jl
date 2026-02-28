@@ -1050,10 +1050,9 @@ Multi-panel plot for STL decomposition result.
 function Durbyn.plot(result::Durbyn.Stats.STLResult; labels::Vector{String}=["data","seasonal","trend","remainder"],
               col_range::Any="lightgray", main::Union{Nothing,String}=nothing, range_bars::Bool=true,
               kwargs...)
-    ts = result.time_series
-    n = length(ts.seasonal)
-    data = ts.seasonal .+ ts.trend .+ ts.remainder
-    series = [data, ts.seasonal, ts.trend, ts.remainder]
+    n = length(result.seasonal)
+    data = result.seasonal .+ result.trend .+ result.remainder
+    series = [data, result.seasonal, result.trend, result.remainder]
     nplot = length(series)
 
     rx = [extrema(s) for s in series]

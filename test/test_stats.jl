@@ -9,6 +9,7 @@ import Durbyn.Stats: adf, ADF, kpss, KPSS, ocsb, OCSB
 import Durbyn.Stats: embed, diff, fourier, ndiffs, nsdiffs
 import Durbyn.Stats: ols, OlsFit, approx, approxfun, seasonal_strength, modelrank
 import Durbyn.Stats: interpolate_missing, longest_contiguous, check_missing
+import Durbyn.Stats: stl, STLResult
 import Durbyn.Stats: mstl, MSTLResult
 
 const EPS_SCALAR = 1e-6
@@ -617,6 +618,43 @@ const REF_KPSS_STAT_AP = 2.8767
             Fh = fourier(AirPassengers, m=12, K=6, h=12)
             @test length(Fh) == 11  # S6 dropped
             @test length(Fh.S1) == 12
+        end
+
+        @testset "stl basic decomposition" begin
+            res = stl(AirPassengers, 12; seasonal_window=13)
+            @test isa(res, STLResult)
+            @test length(res.seasonal) == length(AirPassengers)
+            @test length(res.trend) == length(AirPassengers)
+            @test length(res.remainder) == length(AirPassengers)
+            @test length(res.weights) == length(AirPassengers)
+            @test res.seasonal_window == 13
+            @test res.inner_iterations > 0
+            @test res.outer_iterations >= 0
+        end
+
+        @testset "stl periodic seasonal window" begin
+            res = stl(AirPassengers, 12; seasonal_window=:periodic)
+            @test isa(res, STLResult)
+            @test res.seasonal_window > length(AirPassengers)
+        end
+
+        @testset "stl reconstruction" begin
+            res = stl(AirPassengers, 12; seasonal_window=7)
+            reconstructed = res.seasonal .+ res.trend .+ res.remainder
+            @test all(abs.(reconstructed .- AirPassengers) .< 1e-10)
+        end
+
+        @testset "stl robust produces non-unit weights" begin
+            noisy = copy(AirPassengers)
+            noisy[72] = 1000.0
+            res = stl(noisy, 12; seasonal_window=7, robust=true)
+            @test any(w -> w < 1.0, res.weights)
+        end
+
+        @testset "stl validation" begin
+            @test_throws ArgumentError stl(AirPassengers, 1; seasonal_window=7)
+            @test_throws ArgumentError stl(AirPassengers, 12; seasonal_window=7, seasonal_degree=3)
+            @test_throws ArgumentError stl(AirPassengers, 12; seasonal_window=7, trend_degree=3)
         end
 
         @testset "mstl basic decomposition" begin
