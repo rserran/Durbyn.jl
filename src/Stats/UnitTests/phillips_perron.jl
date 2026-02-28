@@ -8,7 +8,7 @@ Container for the Phillips-Perron (PP) unit root test results.
 - `model::Symbol`: Deterministic specification used in the test regression.
     - `:constant` → regression includes an intercept.
     - `:trend`    → regression includes an intercept and linear trend.
-- `lag::Int`: Truncation lag (`lmax`) used in the Bartlett long-run variance estimator.
+- `lag::Int`: Truncation lag (`max_lag`) used in the Bartlett long-run variance estimator.
 - `teststat::Float64`: Value of the PP test statistic of the requested `type`.
 - `cval::Vector{Float64}`: Finite-sample critical values for the requested `model` when `type == :Z_tau`.
   Order corresponds to `clevels`. For `:Z_alpha`, entries are `NaN`.
@@ -50,16 +50,16 @@ This is a Julia reimplementation of `ur.pp` from **urca**, following the same fo
 - `model::Symbol = :constant`: Deterministic specification in the test regression.
     - `:constant` → `y_t = α + ρ y_{t-1} + u_t`
     - `:trend`    → `y_t = α + ρ y_{t-1} + β·t + u_t` with centered trend `t - n/2`
-- `lags::Symbol = :short`: Rule for the Bartlett truncation lag `lmax` if `use_lag` is not given.
-    - `:short` → `lmax = ⌊ 4 (n/100)^0.25 ⌋`
-    - `:long`  → `lmax = ⌊12 (n/100)^0.25 ⌋`
-- `use_lag::Union{Nothing,Int} = nothing`: Manually specify `lmax`. If negative, a warning is issued
+- `lags::Symbol = :short`: Rule for the Bartlett truncation lag `max_lag` if `use_lag` is not given.
+    - `:short` → `max_lag = ⌊ 4 (n/100)^0.25 ⌋`
+    - `:long`  → `max_lag = ⌊12 (n/100)^0.25 ⌋`
+- `use_lag::Union{Nothing,Int} = nothing`: Manually specify `max_lag`. If negative, a warning is issued
   and the `:short` rule is used.
 
 # Details
 Let `y_t = x_{t}` for `t=2,…,n` and `y_{t-1} = x_{t-1}`. The function runs the OLS regression implied by `model`,
 computes the residual variance `s`, and forms a Bartlett long-run variance estimate
-`σ̂² = s + (2/n) ∑_{ℓ=1}^{lmax} (1 - ℓ/(lmax+1)) * ∑_{t=ℓ+1}^{n} e_t e_{t-ℓ}`.
+`σ̂² = s + (2/n) ∑_{ℓ=1}^{max_lag} (1 - ℓ/(max_lag+1)) * ∑_{t=ℓ+1}^{n} e_t e_{t-ℓ}`.
 From this it constructs the PP statistics `Z_tau` or `Z_alpha` as in Phillips-Perron (1988).
 Finite-sample critical values (MacKinnon-style approximations used in **urca**) are returned for `:Z_tau`
 and `model ∈ {:constant, :trend}`; for `:Z_alpha` the critical values are not provided (`NaN`).
@@ -125,7 +125,7 @@ function phillips_perron(
     model in (:constant, :trend) || throw(ArgumentError("model must be :constant or :trend"))
     type in (:Z_alpha, :Z_tau) || throw(ArgumentError("type must be :Z_alpha or :Z_tau"))
 
-    lmax = if !isnothing(use_lag)
+    max_lag = if !isnothing(use_lag)
         L = Int(use_lag)
         if L < 0
             @warn "use_lag must be a nonnegative integer; using lags=:short default."
@@ -154,35 +154,35 @@ function phillips_perron(
         se = fit.se
         res = fit.residuals
 
-        my_tstat = β[1] / se[1]
-        beta_tstat = β[3] / se[3]
+        intercept_tstat = β[1] / se[1]
+        trend_tstat = β[3] / se[3]
         s = sum(res .^ 2) / n
 
         ybar_var = sum((y .- mean(y)) .^ 2) / n^2
-        myy = sum(y .^ 2) / n^2
-        mty = (sum((1:n) .* y)) / n^(5 / 2)
-        my = sum(y) / n^(3 / 2)
+        sum_y_sq_scaled = sum(y .^ 2) / n^2
+        sum_ty_scaled = (sum((1:n) .* y)) / n^(5 / 2)
+        sum_y_scaled = sum(y) / n^(3 / 2)
 
-        add = _bartlett_LRV(res, n, lmax)
-        sig = s + add
-        λ = 0.5 * (sig - s)
-        λ′ = λ / sig
+        add = _bartlett_lrv(res, n, max_lag)
+        long_run_variance = s + add
+        λ = 0.5 * (long_run_variance - s)
+        λ′ = λ / long_run_variance
 
         M =
-            (1 - n^(-2)) * myy - 12 * mty^2 + 12 * (1 + 1 / n) * mty * my -
-            (4 + 6 / n + 2 / n^2) * my^2
+            (1 - n^(-2)) * sum_y_sq_scaled - 12 * sum_ty_scaled^2 + 12 * (1 + 1 / n) * sum_ty_scaled * sum_y_scaled -
+            (4 + 6 / n + 2 / n^2) * sum_y_scaled^2
 
-        my_stat =
-            sqrt(s / sig) * my_tstat - λ′ * sqrt(sig) * my / (sqrt(M) * sqrt(M + my^2))
-        beta_stat =
-            sqrt(s / sig) * beta_tstat -
-            λ′ * sqrt(sig) * (0.5 * my - mty) / (sqrt(M / 12) * sqrt(ybar_var))
+        z_intercept =
+            sqrt(s / long_run_variance) * intercept_tstat - λ′ * sqrt(long_run_variance) * sum_y_scaled / (sqrt(M) * sqrt(M + sum_y_scaled^2))
+        z_trend =
+            sqrt(s / long_run_variance) * trend_tstat -
+            λ′ * sqrt(long_run_variance) * (0.5 * sum_y_scaled - sum_ty_scaled) / (sqrt(M / 12) * sqrt(ybar_var))
 
-        aux = [round(my_stat, digits = 4), round(beta_stat, digits = 4)]
+        aux = [round(z_intercept, digits = 4), round(z_trend, digits = 4)]
 
         if type == :Z_tau
             tstat = (β[2] - 1) / se[2]
-            teststat = sqrt(s / sig) * tstat - λ′ * sqrt(sig) / sqrt(M)
+            teststat = sqrt(s / long_run_variance) * tstat - λ′ * sqrt(long_run_variance) / sqrt(M)
         else
             α = β[2]
             teststat = n * (α - 1) - λ / M
@@ -192,7 +192,7 @@ function phillips_perron(
         return PhillipsPerron(
             type,
             model,
-            lmax,
+            max_lag,
             teststat,
             cval,
             clevels,
@@ -215,25 +215,25 @@ function phillips_perron(
         se = fit.se
         res = fit.residuals
 
-        my_tstat = β[1] / se[1]
+        intercept_tstat = β[1] / se[1]
         s = sum(res .^ 2) / n
 
         ybar_var = sum((y .- mean(y)) .^ 2) / n^2
-        myy = sum(y .^ 2) / n^2
-        my = sum(y) / n^(3 / 2)
+        sum_y_sq_scaled = sum(y .^ 2) / n^2
+        sum_y_scaled = sum(y) / n^(3 / 2)
 
-        add = _bartlett_LRV(res, n, lmax)
-        sig = s + add
-        λ = 0.5 * (sig - s)
-        λ′ = λ / sig
+        add = _bartlett_lrv(res, n, max_lag)
+        long_run_variance = s + add
+        λ = 0.5 * (long_run_variance - s)
+        λ′ = λ / long_run_variance
 
-        my_stat =
-            sqrt(s / sig) * my_tstat + λ′ * sqrt(sig) * my / (sqrt(myy) * sqrt(ybar_var))
-        aux = [round(my_stat, digits = 4)]
+        z_intercept =
+            sqrt(s / long_run_variance) * intercept_tstat + λ′ * sqrt(long_run_variance) * sum_y_scaled / (sqrt(sum_y_sq_scaled) * sqrt(ybar_var))
+        aux = [round(z_intercept, digits = 4)]
 
         if type == :Z_tau
             tstat = (β[2] - 1) / se[2]
-            teststat = sqrt(s / sig) * tstat - λ′ * sqrt(sig) / sqrt(ybar_var)
+            teststat = sqrt(s / long_run_variance) * tstat - λ′ * sqrt(long_run_variance) / sqrt(ybar_var)
         else
             α = β[2]
             teststat = n * (α - 1) - λ / ybar_var
@@ -243,7 +243,7 @@ function phillips_perron(
         return PhillipsPerron(
             type,
             model,
-            lmax,
+            max_lag,
             teststat,
             cval,
             clevels,
@@ -301,7 +301,7 @@ function show(io::IO, ::MIME"text/plain", x::PhillipsPerron)
 end
 
 function show(io::IO, x::PhillipsPerron)
-    
+
     if get(io, :compact, false)
         print(io, "PhillipsPerron($(round(x.teststat, digits=4)))")
     else

@@ -99,11 +99,11 @@ function show(io::IO, x::OCSB)
     end
 end
 
-@inline z_at(x, t, m) = x[t] - x[t-1] - x[t-m] + x[t-m-1]
-@inline w_at(x, t, m) = x[t] - x[t-m]
-@inline v_at(x, t)    = x[t] - x[t-1]
+@inline _delta_delta_m(x, t, m) = x[t] - x[t-1] - x[t-m] + x[t-m-1]
+@inline _delta_m(x, t, m) = x[t] - x[t-m]
+@inline _delta(x, t)    = x[t] - x[t-1]
 
-function fit_ocsb(x::AbstractVector{<:Real}, lag::Int, maxlag::Int, m::Int)
+function _fit_ocsb_regression(x::AbstractVector{<:Real}, lag::Int, maxlag::Int, m::Int)
     (lag ≥ 0 && maxlag ≥ 0 && m ≥ 1) || throw(ArgumentError("lag and maxlag must be non-negative; m must be ≥ 1"))
     n = length(x)
 
@@ -115,10 +115,10 @@ function fit_ocsb(x::AbstractVector{<:Real}, lag::Int, maxlag::Int, m::Int)
     y_ar = Vector{Float64}(undef, L)
     X_ar = (lag == 0) ? Array{Float64}(undef, L, 0) : Array{Float64}(undef, L, lag)
     @inbounds for (i, t) in enumerate(T)
-        y_ar[i] = z_at(x, t, m)
+        y_ar[i] = _delta_delta_m(x, t, m)
         if lag > 0
             for j in 1:lag
-                X_ar[i, j] = z_at(x, t - j, m)
+                X_ar[i, j] = _delta_delta_m(x, t - j, m)
             end
         end
     end
@@ -131,14 +131,14 @@ function fit_ocsb(x::AbstractVector{<:Real}, lag::Int, maxlag::Int, m::Int)
     Z4 = Vector{Float64}(undef, L)
     Z5 = Vector{Float64}(undef, L)
     @inbounds for (i, t) in enumerate(T)
-        s4 = w_at(x, t - 1, m)
+        s4 = _delta_m(x, t - 1, m)
         for j in 1:lag
-            s4 -= λ[j] * w_at(x, t - 1 - j, m)
+            s4 -= λ[j] * _delta_m(x, t - 1 - j, m)
         end
         Z4[i] = s4
-        s5 = v_at(x, t - m)
+        s5 = _delta(x, t - m)
         for j in 1:lag
-            s5 -= λ[j] * v_at(x, t - m - j)
+            s5 -= λ[j] * _delta(x, t - m - j)
         end
         Z5[i] = s5
     end
@@ -147,7 +147,7 @@ function fit_ocsb(x::AbstractVector{<:Real}, lag::Int, maxlag::Int, m::Int)
     @inbounds for (i, t) in enumerate(T)
         if lag > 0
             for j in 1:lag
-                Xlags[i, j] = z_at(x, t - j, m)
+                Xlags[i, j] = _delta_delta_m(x, t - j, m)
             end
         end
     end
@@ -155,29 +155,29 @@ function fit_ocsb(x::AbstractVector{<:Real}, lag::Int, maxlag::Int, m::Int)
     return ols(y_ar, X_final)
 end
 
-function calculate_ocsb_critical_value(m::Int)
+function _ocsb_critical_value(m::Int)
       log_m = log(m)
       a = -0.2850853 * (log_m - 0.7656451)
       b = (-0.05983644) * ((log_m - 0.7656451)^2)
       return -0.2937411 * exp(a + b) - 1.652202
 end
 
-rss(fit)   = sum(fit.residuals .^ 2)
-nobs(fit)  = length(fit.residuals)
-p_params(fit) = length(fit.coef)
-k_params(fit) = p_params(fit) + 1
+_residual_sum_squares(fit)   = sum(fit.residuals .^ 2)
+_n_observations(fit)  = length(fit.residuals)
+_n_params(fit) = length(fit.coef)
+_n_params_total(fit) = _n_params(fit) + 1
 
-function loglik_ml_lm(fit)
-    n = nobs(fit)
-    r = rss(fit)
+function _loglik_ml(fit)
+    n = _n_observations(fit)
+    r = _residual_sum_squares(fit)
     return -0.5 * n * (log(2π) + 1 + log(r/n))
 end
 
-aic_lm(fit)  = -2 * loglik_ml_lm(fit) + 2 * k_params(fit)
-bic_lm(fit)  = -2 * loglik_ml_lm(fit) + log(nobs(fit)) * k_params(fit)
-aicc_lm(fit) = begin
-    n = nobs(fit); k = k_params(fit)
-    AIC = aic_lm(fit)
+_aic(fit)  = -2 * _loglik_ml(fit) + 2 * _n_params_total(fit)
+_bic(fit)  = -2 * _loglik_ml(fit) + log(_n_observations(fit)) * _n_params_total(fit)
+_aicc(fit) = begin
+    n = _n_observations(fit); k = _n_params_total(fit)
+    AIC = _aic(fit)
     AIC + (2k*(k+1)) / (n - k - 1)
 end
 
@@ -248,8 +248,8 @@ Notes
 
 References
 ----------
-Osborn DR, Chui APL, Smith J, and Birchenhall CR (1988). “Seasonality and the order of integration
-for consumption.” Oxford Bulletin of Economics and Statistics 50(4): 361-377.
+Osborn DR, Chui APL, Smith J, and Birchenhall CR (1988). "Seasonality and the order of integration
+for consumption." Oxford Bulletin of Economics and Statistics 50(4): 361-377.
 
 Examples
 --------
@@ -267,40 +267,39 @@ function ocsb(
 )
     m ≥ 2 || throw(ArgumentError("Data must be seasonal (m ≥ 2) to use ocsb."))
 
-    lmeth = Symbol(lowercase(string(lag_method)))
-    lmeth in (:fixed, :aic, :bic, :aicc) || throw(ArgumentError("lag_method must be one of: :fixed, :aic, :bic, :aicc."))
+    lag_method_lower = Symbol(lowercase(string(lag_method)))
+    lag_method_lower in (:fixed, :aic, :bic, :aicc) || throw(ArgumentError("lag_method must be one of: :fixed, :aic, :bic, :aicc."))
 
-    chosen_lag = maxlag
-    if maxlag > 0 && lmeth != :fixed
-        fits = [fit_ocsb(x, p, maxlag, m) for p in 1:maxlag]
-        icvals = zeros(Float64, maxlag)
-        if lmeth == :aic
-            for p in 1:maxlag; icvals[p] = aic_lm(fits[p]); end
-        elseif lmeth == :bic
-            for p in 1:maxlag; icvals[p] = bic_lm(fits[p]); end
+    selected_lag = maxlag
+    if maxlag > 0 && lag_method_lower != :fixed
+        fits = [_fit_ocsb_regression(x, p, maxlag, m) for p in 1:maxlag]
+        ic_values = zeros(Float64, maxlag)
+        if lag_method_lower == :aic
+            for p in 1:maxlag; ic_values[p] = _aic(fits[p]); end
+        elseif lag_method_lower == :bic
+            for p in 1:maxlag; ic_values[p] = _bic(fits[p]); end
         else
-            for p in 1:maxlag; icvals[p] = aicc_lm(fits[p]); end
+            for p in 1:maxlag; ic_values[p] = _aicc(fits[p]); end
         end
-        id = argmin(icvals) 
-        chosen_lag = id - 1
+        id = argmin(ic_values)
+        selected_lag = id - 1
     end
 
-    reg = fit_ocsb(x, chosen_lag, chosen_lag, m)
+    reg = _fit_ocsb_regression(x, selected_lag, selected_lag, m)
 
     tstats = reg.coef ./ reg.se
     length(tstats) ≥ 2 || throw(ArgumentError("Final regression must include Z4 and Z5 regressors."))
     teststat = tstats[end]
     residuals = reg.residuals
 
-    cval = calculate_ocsb_critical_value(m)
+    cval = _ocsb_critical_value(m)
 
     return OCSB(
         :seasonal,
-        chosen_lag,
+        selected_lag,
         teststat,
         cval,
         Float64.(clevels),
         residuals,
     )
 end
-

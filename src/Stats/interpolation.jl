@@ -3,30 +3,30 @@ function _apply_ties(ys, ties)
     return ties(ys)
 end
 
-function regularize_values(x, y; ties::Union{Function,Symbol}=mean, warn_collapsing::Bool=false, na_rm::Bool=true)
+function _regularize_values(x, y; ties::Union{Function,Symbol}=mean, warn_collapsing::Bool=false, na_rm::Bool=true)
     x = collect(x)
     y = collect(y)
     length(x) == length(y) || throw(ArgumentError("x and y must have the same length"))
 
-    keptNA = false
+    kept_na = false
     na_x = ismissingish.(x)
     na_y = ismissingish.(y)
     any_na = any(na_x .| na_y)
 
-    notNA = nothing
-    nx = Int64(0)
+    not_na = nothing
+    n_valid = Int64(0)
     if any_na
         ok = .!(na_x .| na_y)
         if na_rm
             x = x[ok]; y = y[ok]
-            nx = length(x)
+            n_valid = length(x)
         else
-            keptNA = true
-            nx = sum(ok)
-            notNA = ok
+            kept_na = true
+            n_valid = sum(ok)
+            not_na = ok
         end
     else
-        nx = length(x)
+        n_valid = length(x)
     end
 
     if !(ties == :ordered || ties isa Function)
@@ -43,7 +43,7 @@ function regularize_values(x, y; ties::Union{Function,Symbol}=mean, warn_collaps
 
     if !ordered
         ux = unique(x)
-        if length(ux) < nx
+        if length(ux) < n_valid
             if warn_collapsing
                 @warn "collapsing to unique x values"
             end
@@ -60,41 +60,41 @@ function regularize_values(x, y; ties::Union{Function,Symbol}=mean, warn_collaps
             end
             x = newx
             y = newy
-            if keptNA
-                notNA = .!ismissingish.(x)
+            if kept_na
+                not_na = .!ismissingish.(x)
             end
         end
     end
 
-    return (x=x, y=y, keptNA=keptNA, notNA=notNA)
+    return (x=x, y=y, keptNA=kept_na, notNA=not_na)
 end
 
-function _approxtest(x::Vector{Float64}, y::Vector{Float64}, method::Symbol, f::Float64; na_rm::Bool=true)
+function _validate_interpolation(x::Vector{Float64}, y::Vector{Float64}, method::Symbol, f::Float64; na_rm::Bool=true)
     (method === :linear || method === :constant) ||
-        throw(ArgumentError("approx(): invalid interpolation method (use :linear or :constant)"))
+        throw(ArgumentError("interpolate_xy(): invalid interpolation method (use :linear or :constant)"))
     if method === :constant
-        (!isfinite(f) || f < 0.0 || f > 1.0) && throw(ArgumentError("approx(): invalid f value"))
+        (!isfinite(f) || f < 0.0 || f > 1.0) && throw(ArgumentError("interpolate_xy(): invalid f value"))
     end
 
     if na_rm
         @inbounds for i in eachindex(x,y)
-            (isnan(x[i]) || isnan(y[i])) && throw(ArgumentError("approx(): attempted to interpolate missing values"))
+            (isnan(x[i]) || isnan(y[i])) && throw(ArgumentError("interpolate_xy(): attempted to interpolate missing values"))
         end
     else
         @inbounds for i in eachindex(x)
-            isnan(x[i]) && throw(ArgumentError("approx(x,y, .., na.rm=false): missing values in x are not allowed"))
+            isnan(x[i]) && throw(ArgumentError("interpolate_xy(x,y, .., na_rm=false): missing values in x are not allowed"))
         end
     end
 
-    length(x) == length(y) || throw(ArgumentError("approx(): length(x) and length(y) must match"))
-    length(x) > 0 || throw(ArgumentError("approx(): zero non-NA points"))
+    length(x) == length(y) || throw(ArgumentError("interpolate_xy(): length(x) and length(y) must match"))
+    length(x) > 0 || throw(ArgumentError("interpolate_xy(): zero non-NA points"))
     if method === :linear
-        length(x) > 1 || throw(ArgumentError("approx(): need at least two non-NA values to interpolate"))
+        length(x) > 1 || throw(ArgumentError("interpolate_xy(): need at least two non-NA values to interpolate"))
     end
     return nothing
 end
 
-function _approx1(v::Float64, x::Vector{Float64}, y::Vector{Float64}, method::Symbol,
+function _interpolate_point(v::Float64, x::Vector{Float64}, y::Vector{Float64}, method::Symbol,
                   yleft::Float64, yright::Float64, f::Float64)
     if v < x[1]
         return yleft
@@ -119,7 +119,7 @@ function _approx1(v::Float64, x::Vector{Float64}, y::Vector{Float64}, method::Sy
 end
 
 """
-    approx(
+    interpolate_xy(
     x::AbstractVector,
     y::AbstractVector;
     xout::Union{AbstractVector,Nothing} = nothing,
@@ -132,10 +132,11 @@ end
     ties::Union{Function, Symbol} = mean,
     na_rm::Bool = true,)
 
-Interpolation Functions
+Piecewise interpolation of `(x, y)` data at query points.
 
-Return a pair of vectors `(x = xout_vec, y = yout_vec)` which linearly or
-constant-step interpolate the given data points.
+Given a set of `(x, y)` coordinate pairs, compute interpolated `y` values at
+the locations specified by `xout` (or at `n` equally spaced points if `xout`
+is not given). Supports both linear and constant (step) interpolation.
 
 # Arguments
 - `x, y`: Numeric vectors giving the coordinates of the points to be interpolated.
@@ -176,9 +177,6 @@ constant-step interpolate the given data points.
   Useful choices include `mean`, `min`, and `max`.
 - If `ties == :ordered`, `x` is assumed to be already sorted (and may contain
   duplicates, which are kept); no collapsing is done. This is fastest for large inputs.
-- Supplying `ties = (:ordered, f)` in R slightly changes performance; in this
-  Julia API, use `ties = :ordered` when already sorted, otherwise pass an
-  aggregator function (e.g. `ties = mean`).
 - If unspecified, `yleft` defaults to `missing` if `rule[1] == 1`, else `y[1]`;
   `yright` defaults to `missing` if `rule[2] == 1`, else `y[end]`.
 - The first `y` value is used for extrapolation to the left (when `rule[1] == 2`)
@@ -189,7 +187,7 @@ A named tuple `(x = xout_vec, y = yout_vec)` containing the interpolation grid
 and corresponding interpolated values, according to the chosen `method` and `rule`.
 
 # References
-Becker, R. A., Chambers, J. M. and Wilks, A. R. (1988) The New S Language. Wadsworth & Brooks/Cole.
+- Becker, R. A., Chambers, J. M. and Wilks, A. R. (1988) *The New S Language*. Wadsworth & Brooks/Cole.
 
 # Examples
 ```julia
@@ -197,27 +195,27 @@ x = 1:10
 y = randn(10)
 
 # Linear interpolation at default n=50 points
-res = approx(x, y)
+res = interpolate_xy(x, y)
 
 # Linear interpolation at specific points
 xq = 0:0.5:11
-res2 = approx(x, y; xout=xq)
+res2 = interpolate_xy(x, y; xout=xq)
 
 # Constant (step) interpolation, left-continuous (f=1)
-res_step = approx(x, y; xout=xq, method=:constant, f=1.0)
+res_step = interpolate_xy(x, y; xout=xq, method=:constant, f=1.0)
 
 # Different extrapolation on left (constant) and right (NA/missing)
-res_lr = approx(x, y; xout=xq, rule=(2, 1))
+res_lr = interpolate_xy(x, y; xout=xq, rule=(2, 1))
 
 # Handling ties via aggregation
 xt = [2, 2:4... , 4, 4, 5, 5, 7, 7, 7]
 yt = [1:6... , 5, 4, 3:-1:1...]
-res_mean = approx(xt, yt; xout=xt, ties=mean)       # collapse ties by mean
-res_min  = approx(xt, yt; xout=xt, ties=min)        # collapse ties by min
-res_ord  = approx(xt, yt; xout=xt, ties=:ordered)   # assume already ordered
+res_mean = interpolate_xy(xt, yt; xout=xt, ties=mean)
+res_min  = interpolate_xy(xt, yt; xout=xt, ties=min)
+res_ord  = interpolate_xy(xt, yt; xout=xt, ties=:ordered)
 ```
 """
-function approx(x::AbstractVector, y::AbstractVector;
+function interpolate_xy(x::AbstractVector, y::AbstractVector;
                 xout::Union{AbstractVector,Nothing}=nothing,
                 method::Symbol=:linear,
                 n::Integer=50,
@@ -228,54 +226,53 @@ function approx(x::AbstractVector, y::AbstractVector;
                 ties::Union{Function,Symbol}=mean,
                 na_rm::Bool=true)
 
-    rule_t = rule isa Integer ? (rule, rule) : rule
-    length(rule_t) == 2 || throw(ArgumentError("rule must have 1 or 2 integers"))
+    rule_tuple = rule isa Integer ? (rule, rule) : rule
+    length(rule_tuple) == 2 || throw(ArgumentError("rule must have 1 or 2 integers"))
 
-    r = regularize_values(x, y; ties=ties, na_rm=na_rm)
+    r = _regularize_values(x, y; ties=ties, na_rm=na_rm)
     x = r.x; y = r.y
 
-    noNA = na_rm || !r.keptNA
-    nx = noNA ? length(x) : sum(r.notNA)
-    isnan(float(nx)) && throw(ArgumentError("invalid length(x)"))
+    no_na = na_rm || !r.keptNA
+    n_valid = no_na ? length(x) : sum(r.notNA)
+    isnan(float(n_valid)) && throw(ArgumentError("invalid length(x)"))
 
     if isnothing(yleft)
-        yleft = (rule_t[1] == 1) ? NaN : float(y[1])
+        yleft = (rule_tuple[1] == 1) ? NaN : float(y[1])
     end
     if isnothing(yright)
-        yright = (rule_t[2] == 1) ? NaN : float(y[end])
+        yright = (rule_tuple[2] == 1) ? NaN : float(y[end])
     end
 
     method = method === :linear ? :linear : method === :constant ? :constant :
         throw(ArgumentError("invalid interpolation method"))
     f = float(f)
 
-    xv = collect(Float64[ismissing(v) ? NaN : Float64(v) for v in x])
-    yv = collect(Float64[ismissing(v) ? NaN : Float64(v) for v in y])
-    _approxtest(xv, yv, method, f; na_rm=na_rm)
+    x_float = collect(Float64[ismissing(v) ? NaN : Float64(v) for v in x])
+    y_float = collect(Float64[ismissing(v) ? NaN : Float64(v) for v in y])
+    _validate_interpolation(x_float, y_float, method, f; na_rm=na_rm)
 
     if isnothing(xout)
-        n > 0 || throw(ArgumentError("approx requires n >= 1"))
-        if noNA
-            xout = range(xv[1], xv[end], length=n)
+        n > 0 || throw(ArgumentError("interpolate_xy requires n >= 1"))
+        if no_na
+            xout = range(x_float[1], x_float[end], length=n)
         else
-            xnn = xv[r.notNA]
+            xnn = x_float[r.notNA]
             xout = range(xnn[1], xnn[end], length=n)
         end
     end
 
-    xoutv = collect(float.(xout))
-    yout = Vector{Float64}(undef, length(xoutv))
-    @inbounds for i in eachindex(xoutv)
-        yi = ismissing(xoutv[i]) ? NaN : _approx1(xoutv[i], xv, yv, method, yleft, yright, f)
+    x_query = collect(float.(xout))
+    yout = Vector{Float64}(undef, length(x_query))
+    @inbounds for i in eachindex(x_query)
+        yi = ismissing(x_query[i]) ? NaN : _interpolate_point(x_query[i], x_float, y_float, method, yleft, yright, f)
         yout[i] = yi
     end
-    return (x = xoutv, y = yout)
+    return (x = x_query, y = yout)
 end
 
 
 """
-
-    approxfun(
+    make_interpolator(
     x::AbstractVector,
     y::AbstractVector;
     method::Symbol = :linear,
@@ -284,9 +281,9 @@ end
     rule::Tuple = (1, 1),
     f::Real = 0.0,
     ties::Union{Function, Symbol} = mean,
-    na_rm::Bool = true,)k
+    na_rm::Bool = true,)
 
-Return a function performing linear or constant interpolation of the given data points.
+Create a callable interpolation function from `(x, y)` data.
 
 The returned callable `g` closes over the (processed) data and, when called with
 a scalar or vector of `x` values, returns the corresponding interpolated values.
@@ -308,52 +305,51 @@ a scalar or vector of `x` values, returns the corresponding interpolated values.
   depending on `rule`.
 
 # Details
-- Inputs are normalized similarly to [`approx`](@ref). For `:linear`, at least two
+- Inputs are normalized similarly to [`interpolate_xy`](@ref). For `:linear`, at least two
   complete `(x, y)` pairs are required; for `:constant`, at least one.
 - The function validates once at construction; subsequent calls do not re-validate.
 
 !!! warning
-    The returned function closes over internal arrays. It’s safe to use within the
+    The returned function closes over internal arrays. It's safe to use within the
     same Julia session, but if you serialize and reload it elsewhere, captured arrays
     and code versions must remain compatible.
 
 # Returns
 A callable `g(v)` where `v` may be a scalar or a vector of query points. The
-result matches the behavior of `approx` for the same arguments.
-
+result matches the behavior of `interpolate_xy` for the same arguments.
 
 # References
-Becker, R. A., Chambers, J. M. and Wilks, A. R. (1988) The New S Language. Wadsworth & Brooks/Cole.
+- Becker, R. A., Chambers, J. M. and Wilks, A. R. (1988) *The New S Language*. Wadsworth & Brooks/Cole.
 
 # Examples
 ```julia
 x = 1:10
 y = randn(10)
 
-g  = approxfun(x, y)                     # linear
-gc = approxfun(x, y; method=:constant)   # step (right-continuous by default, f=0)
+g  = make_interpolator(x, y)                     # linear
+gc = make_interpolator(x, y; method=:constant)   # step (right-continuous by default, f=0)
 
 g(5.5)           # scalar query
 g.(0:0.25:11)    # broadcasting over a range
 
 # Different left/right extrapolation
-h = approxfun(x, y; rule=(2, 1))
+h = make_interpolator(x, y; rule=(2, 1))
 h.(0:0.5:11)
 
 # Step function, left-continuous
-gl = approxfun(x, y; method=:constant, f=1.0)
+gl = make_interpolator(x, y; method=:constant, f=1.0)
 gl.(0:0.5:11)
 
 # Ties handling
 xt = [2, 2:4..., 4, 4, 5, 5, 7, 7, 7]
 yt = [1:6..., 5, 4, 3:-1:1...]
-gmean = approxfun(xt, yt; ties=mean)     # collapse ties
-gord  = approxfun(xt, yt; ties=:ordered) # assume already ordered
+gmean = make_interpolator(xt, yt; ties=mean)     # collapse ties
+gord  = make_interpolator(xt, yt; ties=:ordered) # assume already ordered
 gmean(xt)
 ```
 
 """
-function approxfun(x::AbstractVector, y::AbstractVector;
+function make_interpolator(x::AbstractVector, y::AbstractVector;
                    method::Symbol=:linear,
                    yleft::Union{Float64,Nothing}=nothing,
                    yright::Union{Float64,Nothing}=nothing,
@@ -362,42 +358,41 @@ function approxfun(x::AbstractVector, y::AbstractVector;
                    ties::Union{Function,Symbol}=mean,
                    na_rm::Bool=true)
 
-    rule_t = rule isa Integer ? (rule, rule) : rule
-    length(rule_t) == 2 || throw(ArgumentError("rule must have 1 or 2 integers"))
+    rule_tuple = rule isa Integer ? (rule, rule) : rule
+    length(rule_tuple) == 2 || throw(ArgumentError("rule must have 1 or 2 integers"))
 
-    r = regularize_values(x, y; ties=ties, na_rm=na_rm)
+    r = _regularize_values(x, y; ties=ties, na_rm=na_rm)
     x = r.x; y = r.y
 
-    nx = (na_rm || !r.keptNA) ? length(x) : sum(r.notNA)
-    isnan(float(nx)) && throw(ArgumentError("invalid length(x)"))
+    n_valid = (na_rm || !r.keptNA) ? length(x) : sum(r.notNA)
+    isnan(float(n_valid)) && throw(ArgumentError("invalid length(x)"))
 
     if isnothing(yleft)
-        yleft = (rule_t[1] == 1) ? NaN : float(y[1])
+        yleft = (rule_tuple[1] == 1) ? NaN : float(y[1])
     end
     if isnothing(yright)
-        yright = (rule_t[2] == 1) ? NaN : float(y[end])
+        yright = (rule_tuple[2] == 1) ? NaN : float(y[end])
     end
 
     method = method === :linear ? :linear : method === :constant ? :constant :
         throw(ArgumentError("invalid interpolation method"))
     f = float(f)
 
-    xv = collect(Float64[ismissing(v) ? NaN : Float64(v) for v in x])
-    yv = collect(Float64[ismissing(v) ? NaN : Float64(v) for v in y])
-    _approxtest(xv, yv, method, f; na_rm=na_rm)
+    x_float = collect(Float64[ismissing(v) ? NaN : Float64(v) for v in x])
+    y_float = collect(Float64[ismissing(v) ? NaN : Float64(v) for v in y])
+    _validate_interpolation(x_float, y_float, method, f; na_rm=na_rm)
 
     return v -> begin
         if v isa AbstractVector
             vv = collect(float.(v))
             out = Vector{Float64}(undef, length(vv))
             @inbounds for i in eachindex(vv)
-                out[i] = ismissing(vv[i]) ? NaN : _approx1(vv[i], xv, yv, method, yleft, yright, f)
+                out[i] = ismissing(vv[i]) ? NaN : _interpolate_point(vv[i], x_float, y_float, method, yleft, yright, f)
             end
             out
         else
             vv = float(v)
-            ismissing(vv) ? NaN : _approx1(vv, xv, yv, method, yleft, yright, f)
+            ismissing(vv) ? NaN : _interpolate_point(vv, x_float, y_float, method, yleft, yright, f)
         end
     end
 end
-

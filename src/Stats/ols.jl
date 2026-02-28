@@ -20,17 +20,17 @@ println(ols_model.coef)
 
 """
 struct OlsFit
-coef::Vector{Float64}
-fitted::Vector{Float64}
-residuals::Vector{Float64}
-sigma2::Float64
-cov::Matrix{Float64}
-se::Vector{Float64}
-df_residual::Int
+    coef::Vector{Float64}
+    fitted::Vector{Float64}
+    residuals::Vector{Float64}
+    sigma2::Float64
+    cov::Matrix{Float64}
+    se::Vector{Float64}
+    df_residual::Int
 end
 
 """
-ols(y, X) -> OlsFit
+    ols(y, X) -> OlsFit
 
 Fits an ordinary least squares (OLS) linear regression model.
 
@@ -42,7 +42,7 @@ Fits an ordinary least squares (OLS) linear regression model.
 
 # Returns
 
-* An `OlsFit` object containing coefficients, residuals, 
+* An `OlsFit` object containing coefficients, residuals,
 fitted values, variance, standard errors, and more.
 
 # Example
@@ -61,20 +61,20 @@ println(model.coef)
 
 """
 function ols(y, X)
-β = X \ y
-fitted = X * β
-residuals = y - fitted
-n, p = size(X)
-df_residual = n - p
-σ2 = sum(residuals .^ 2) / df_residual
-XtX = X' * X
-cov_β = σ2 * inv(XtX)
-se = sqrt.(diag(cov_β))
-return OlsFit(β, fitted, residuals, σ2, cov_β, se, df_residual)
+    β = X \ y
+    fitted = X * β
+    residuals = y - fitted
+    n, p = size(X)
+    df_residual = n - p
+    σ2 = sum(residuals .^ 2) / df_residual
+    XtX = X' * X
+    cov_β = σ2 * inv(XtX)
+    se = sqrt.(diag(cov_β))
+    return OlsFit(β, fitted, residuals, σ2, cov_β, se, df_residual)
 end
 
 """
-predict(model::OlsFit, Xnew) -> Vector{Float64}
+    predict(model::OlsFit, Xnew) -> Vector{Float64}
 
 Predicts the response variable for new data using a fitted OLS model.
 
@@ -96,7 +96,7 @@ yhat = predict(model, Xnew)
 
 """
 function predict(model::OlsFit, Xnew)
-return Xnew * model.coef
+    return Xnew * model.coef
 end
 
 """

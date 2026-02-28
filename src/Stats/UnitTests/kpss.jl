@@ -28,7 +28,7 @@ function _kpss(y, type::Symbol=:mu, lags::Symbol=:short, use_lag::Union{Nothing,
     type in (:mu, :tau) || throw(ArgumentError("type must be :mu or :tau"))
     lags in (:short, :long, :nil) || throw(ArgumentError("lags must be :short, :long, or :nil"))
 
-    lmax =
+    max_lag =
         if !isnothing(use_lag)
             L = Int(use_lag)
             if L < 0
@@ -57,18 +57,18 @@ function _kpss(y, type::Symbol=:mu, lags::Symbol=:short, use_lag::Union{Nothing,
         res = fit.residuals
     end
 
-    S = cumsum(res)
-    numerator = sum(S .^ 2) / n^2
-    s2 = sum(res .^ 2) / n
-    if lmax == 0
-        denominator = s2
+    cumulative_sum = cumsum(res)
+    numerator = sum(cumulative_sum .^ 2) / n^2
+    residual_variance = sum(res .^ 2) / n
+    if max_lag == 0
+        denominator = residual_variance
     else
-        add = _bartlett_LRV(res, n, lmax)
-        denominator = s2 + add
+        add = _bartlett_lrv(res, n, max_lag)
+        denominator = residual_variance + add
     end
 
     teststat = numerator / denominator
-    return KPSS(type, lmax, teststat, cval, clevels, res)
+    return KPSS(type, max_lag, teststat, cval, clevels, res)
 end
 
 """
@@ -136,7 +136,7 @@ summary(x::KPSS) = "KPSS(teststat=$(round(x.teststat, digits=4)), type=$(x.type)
 
 function show(io::IO, ::MIME"text/plain", x::KPSS)
     println(io, "KPSS Unit Root / Cointegration Test")
-    println(io, "Deterministic component (type): ", 
+    println(io, "Deterministic component (type): ",
     x.type == :tau ? "trend (tau)" : "level (mu)")
     println(io, "Lag truncation (bandwidth): ", x.lag)
 

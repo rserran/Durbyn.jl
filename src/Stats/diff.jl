@@ -1,7 +1,7 @@
-function lag_series(x::AbstractVector, k::Int)
+function _lag_series(x::AbstractVector, k::Int)
     n = length(x)
     result = fill(NaN, length(x))
-    
+
     if k > 0
         for i in (k+1):n
             result[i] = x[i - k]
@@ -51,12 +51,12 @@ function diff(x::AbstractVector; lag::Int=1, differences::Int=1)
         return x[1:0]
     end
 
-    r = copy(x)
+    result = copy(x)
     for _ in 1:differences
-        r = r .- lag_series(r, lag)
+        result = result .- _lag_series(result, lag)
     end
 
-    return r
+    return result
 end
 
 
@@ -99,27 +99,27 @@ diff(x; lag=1, differences=1)
 ```
 """
 function diff(x::AbstractMatrix; lag::Int=1, differences::Int=1)
-    nrow, ncol = size(x)
+    n_rows, n_cols = size(x)
     if lag < 1 || differences < 1
         throw(ArgumentError("Bad value for 'lag' or 'differences'"))
     end
-    if lag * differences >= nrow
+    if lag * differences >= n_rows
         return x[1:0, :]
     end
 
-    r = Matrix{Float64}(x)
-    tmp = similar(r)
+    result = Matrix{Float64}(x)
+    buffer = similar(result)
     for _ in 1:differences
-        for j in 1:ncol
+        for j in 1:n_cols
             @views begin
-                col = view(r, :, j)
-                tmp[:, j] = col .- lag_series(col, lag)
+                col = view(result, :, j)
+                buffer[:, j] = col .- _lag_series(col, lag)
             end
         end
-        r, tmp = tmp, r
+        result, buffer = buffer, result
     end
 
-    return r
+    return result
 end
 
 """
@@ -133,4 +133,3 @@ function diff(x::NamedMatrix; lag::Int=1, differences::Int=1)
     rownames = isnothing(x.rownames) ? nothing : copy(x.rownames)
     return NamedMatrix{eltype(data)}(data, rownames, copy(x.colnames))
 end
-

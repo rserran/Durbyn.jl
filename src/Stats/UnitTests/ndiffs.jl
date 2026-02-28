@@ -1,6 +1,6 @@
 
 """
-    ndiffs(x; alpha=0.05, test=:kpss, deterministic=:level, maxd=2; kwargs...) -> Int
+    ndiffs(x; alpha=0.05, test=:kpss, deterministic=:level, max_d=2; kwargs...) -> Int
 
 Number of differences required for a stationary series.
 
@@ -32,7 +32,7 @@ Internally, the following mappings are used when calling the tests:
 - PP:   `deterministic = :level` → `model = :constant`, `deterministic = :trend` → `model = :trend`
 
 Critical values and their nominal significance levels are linearly interpolated
-to obtain a p-value (matching R’s `approx(..., rule=2)` behavior).
+to obtain a p-value (matching R's `approx(..., rule=2)` behavior via `interpolate_xy`).
 
 If no `use_lag` is supplied to KPSS, the lag is set by default to
 `trunc(3 * sqrt(length(x)) / 13)`.
@@ -67,6 +67,7 @@ If no `use_lag` is supplied to KPSS, the lag is set by default to
 `kpss`, `adf`, `phillips_perron`
 
 ### References
+- Hyndman, R. J. & Athanasopoulos, G. (2021). *Forecasting: Principles and Practice* (3rd ed), OTexts.
 - Dickey, D.A., and Fuller, W.A. (1979). *Distribution of the Estimators for Autoregressive
   Time Series with a Unit Root*. **JASA**, 74, 427-431.
 - Kwiatkowski, D., Phillips, P.C.B., Schmidt, P., and Shin, Y. (1992). *Testing the Null
@@ -89,11 +90,11 @@ function ndiffs(x::AbstractVector;
     alpha::Real=0.05,
     test::Symbol=:kpss,
     deterministic::Symbol=:level,
-    maxd::Integer=2,
+    max_d::Integer=2,
     kwargs...)::Int
 
-    xclean = [Float64(v) for v in x if !ismissing(v) && !(v isa AbstractFloat && isnan(v))]
-    if isempty(xclean)
+    x_clean = [Float64(v) for v in x if !ismissing(v) && !(v isa AbstractFloat && isnan(v))]
+    if isempty(x_clean)
         return 0
     end
 
@@ -103,33 +104,33 @@ function ndiffs(x::AbstractVector;
               "Specified alpha less than min; setting alpha = 0.01"
     end
 
-    is_constant(v) = length(unique(v)) ≤ 1
+    _is_constant_series(v) = length(unique(v)) ≤ 1
     d = 0
-    if is_constant(xclean)
+    if _is_constant_series(x_clean)
         return d
     end
 
-    need_diff = run_unit_root_check(xclean; test=test, alpha=α,
+    need_diff = _run_unit_root_test(x_clean; test=test, alpha=α,
         deterministic=deterministic,
-        d_for_msg=d, kwargs...)
+        diff_order=d, kwargs...)
     if need_diff === missing
         return d
     elseif need_diff === false
         return d
     end
 
-    while d < maxd
+    while d < max_d
         d += 1
-        xclean = diff(xclean)
-        xclean = dropmissing(xclean)
+        x_clean = diff(x_clean)
+        x_clean = dropmissing(x_clean)
 
-        if isempty(xclean) || length(xclean) == 1 || is_constant(xclean)
+        if isempty(x_clean) || length(x_clean) == 1 || _is_constant_series(x_clean)
             return d
         end
 
-        need_diff = run_unit_root_check(xclean; test=test, alpha=α,
+        need_diff = _run_unit_root_test(x_clean; test=test, alpha=α,
             deterministic=deterministic,
-            d_for_msg=d, kwargs...)
+            diff_order=d, kwargs...)
 
         if need_diff === missing
             return d - 1
@@ -142,18 +143,18 @@ function ndiffs(x::AbstractVector;
 end
 
 
-function run_unit_root_check(xvec::AbstractVector;
+function _run_unit_root_test(xvec::AbstractVector;
     test::Symbol=:kpss,
     alpha::Real=0.05,
     deterministic::Symbol=:level,
-    d_for_msg::Int=0,
+    diff_order::Int=0,
     kwargs...)::Union{Bool,Missing}
 
     kpss_type = deterministic === :trend ? :tau : :mu
     adf_type = deterministic === :trend ? :trend : :drift
     pp_model = deterministic === :trend ? :trend : :constant
 
-    function with_kpss_lag(y; kwargs...)
+    function _kpss_with_default_lag(y; kwargs...)
         nt = length(y)
         default_lag = trunc(Int, 3 * sqrt(nt) / 13)
         if !haskey(kwargs, :use_lag)
@@ -162,24 +163,24 @@ function run_unit_root_check(xvec::AbstractVector;
             return kpss(y; type=kpss_type, kwargs...)
         end
     end
-    norm_p(p) = (ismissing(p) || (p isa Real && isnan(p))) ? missing : p
+    _normalize_pvalue(p) = (ismissing(p) || (p isa Real && isnan(p))) ? missing : p
 
     try
         if test === :kpss
-            t = with_kpss_lag(xvec; kwargs...)
-            p = norm_p(only(approx(t.cval, t.clevels, xout=[t.teststat[1]], rule=2).y))
+            t = _kpss_with_default_lag(xvec; kwargs...)
+            p = _normalize_pvalue(only(interpolate_xy(t.cval, t.clevels, xout=[t.teststat[1]], rule=2).y))
             return p === missing ? missing : p < alpha
 
         elseif test === :adf
             t = adf(xvec; type=adf_type, kwargs...)
             tau_stat = t.teststat.data[1, 1]
             tau_cvals = vec(t.cval[1, :])
-            p = norm_p(only(approx(tau_cvals, t.clevels, xout=[tau_stat], rule=2).y))
+            p = _normalize_pvalue(only(interpolate_xy(tau_cvals, t.clevels, xout=[tau_stat], rule=2).y))
             return p === missing ? missing : p > alpha
 
         elseif test === :pp
             t = phillips_perron(xvec; type=:Z_tau, model=pp_model, kwargs...)
-            p = norm_p(only(approx(t.cval, t.clevels, xout=[t.teststat[1]], rule=2).y))
+            p = _normalize_pvalue(only(interpolate_xy(t.cval, t.clevels, xout=[t.teststat[1]], rule=2).y))
             return p === missing ? missing : p > alpha
 
         else
@@ -187,7 +188,7 @@ function run_unit_root_check(xvec::AbstractVector;
         end
 
     catch e
-        @warn "Unit root test error at $(d_for_msg==0 ? "first" : string(d_for_msg+1)*"th") diff; using $d_for_msg differences. $(nameof(typeof(e))): $(e)"
+        @warn "Unit root test error at $(diff_order==0 ? "first" : string(diff_order+1)*"th") diff; using $diff_order differences. $(nameof(typeof(e))): $(e)"
         return false
     end
 end

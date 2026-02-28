@@ -487,9 +487,10 @@ period (number of observations per cycle) and must be at least two.
 
 # References
 
-R. B. Cleveland, W. S. Cleveland, J. E. McRae, and I. Terpenning (1990)
-*STL: A Seasonal-Trend Decomposition Procedure Based on Loess.*
-Journal of Official Statistics, 6, 3--73.
+- R. B. Cleveland, W. S. Cleveland, J. E. McRae, and I. Terpenning (1990).
+  *STL: A Seasonal-Trend Decomposition Procedure Based on Loess.*
+  Journal of Official Statistics, 6, 3–73.
+- G. Bodin, *SeasonalTrendLoess.jl*, <https://github.com/guilhermebodin/SeasonalTrendLoess.jl>
 
 # Arguments
 

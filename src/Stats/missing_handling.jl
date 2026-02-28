@@ -210,7 +210,7 @@ y_filled = interpolate_missing(y; lambda=0.5)
 - Hyndman, R.J. & Athanasopoulos, G. (2021). *Forecasting: Principles and Practice* (3rd ed.), OTexts.
 
 # See also
-[`mstl`](@ref), [`approx`](@ref)
+[`mstl`](@ref), [`interpolate_xy`](@ref)
 """
 function interpolate_missing(x::AbstractVector{T};
                    m::Union{Int,Nothing}=nothing,
@@ -220,24 +220,24 @@ function interpolate_missing(x::AbstractVector{T};
     n = length(x)
     freq = isnothing(m) ? 1 : max(1, m)
 
-    missng = [ismissing(v) || (v isa AbstractFloat && isnan(v)) for v in x]
+    is_missing = [ismissing(v) || (v isa AbstractFloat && isnan(v)) for v in x]
 
-    if sum(missng) == 0
+    if sum(is_missing) == 0
         return collect(float.(coalesce.(x, NaN)))
     end
 
-    origx = collect(float.(coalesce.(x, NaN)))
+    original = collect(float.(coalesce.(x, NaN)))
 
-    non_miss_vals = origx[.!missng]
+    non_miss_vals = original[.!is_missing]
     if isempty(non_miss_vals)
         throw(ArgumentError("All values are missing"))
     end
-    rangex = extrema(non_miss_vals)
-    drangex = rangex[2] - rangex[1]
+    value_range = extrema(non_miss_vals)
+    value_spread = value_range[2] - value_range[1]
 
-    xu = copy(origx)
+    working = copy(original)
 
-    n_valid = sum(.!missng)
+    n_valid = sum(.!is_missing)
     use_linear = if !isnothing(linear)
         linear
     else
@@ -246,17 +246,17 @@ function interpolate_missing(x::AbstractVector{T};
 
     λ = lambda
     if !isnothing(lambda)
-        xu_valid = xu[.!missng]
-        xu_transformed, λ = box_cox(xu_valid, freq; lambda=lambda)
-        xu[.!missng] .= xu_transformed
+        working_valid = working[.!is_missing]
+        working_transformed, λ = box_cox(working_valid, freq; lambda=lambda)
+        working[.!is_missing] .= working_transformed
     end
 
     tt = 1:n
-    idx = tt[.!missng]
+    idx = tt[.!is_missing]
 
     if use_linear
-        result = approx(idx, xu[idx]; xout=collect(tt), rule=(2, 2))
-        xu = result.y
+        result = interpolate_xy(idx, working[idx]; xout=collect(tt), rule=(2, 2))
+        working = result.y
     else
         K = min(div(freq, 2), 5)
 
@@ -265,18 +265,18 @@ function interpolate_missing(x::AbstractVector{T};
         trend_terms = hcat(ones(n), _poly_matrix(collect(tt), poly_degree))
         X = hcat(fourier_terms, trend_terms)
 
-        X_valid = X[.!missng, :]
-        y_valid = xu[.!missng]
+        X_valid = X[.!is_missing, :]
+        y_valid = working[.!is_missing]
 
         use_linear_fill = false
         try
             fit = ols(y_valid, X_valid)
             pred = X * fit.coef
-            pred_miss = pred[missng]
-            pred_range_ok = all(pred_miss .>= rangex[1] - 0.5 * drangex) &&
-                           all(pred_miss .<= rangex[2] + 0.5 * drangex)
+            pred_miss = pred[is_missing]
+            pred_range_ok = all(pred_miss .>= value_range[1] - 0.5 * value_spread) &&
+                           all(pred_miss .<= value_range[2] + 0.5 * value_spread)
             if pred_range_ok
-                xu[missng] .= pred_miss
+                working[is_missing] .= pred_miss
             else
                 use_linear_fill = true
             end
@@ -285,25 +285,25 @@ function interpolate_missing(x::AbstractVector{T};
         end
 
         if use_linear_fill
-            result = approx(idx, xu[idx]; xout=collect(tt), rule=(2, 2))
-            xu = result.y
+            result = interpolate_xy(idx, working[idx]; xout=collect(tt), rule=(2, 2))
+            working = result.y
         end
 
         for i in 1:n
-            if missng[i]
+            if is_missing[i]
                 month = ((i - 1) % freq) + 1
-                same_month_idx = [j for j in 1:n if ((j - 1) % freq) + 1 == month && !missng[j]]
+                same_month_idx = [j for j in 1:n if ((j - 1) % freq) + 1 == month && !is_missing[j]]
                 if !isempty(same_month_idx)
-                    same_month_vals = origx[same_month_idx]
+                    same_month_vals = original[same_month_idx]
                     seasonal_mean = mean(same_month_vals)
-                    if abs(xu[i] - seasonal_mean) > 0.3 * drangex
+                    if abs(working[i] - seasonal_mean) > 0.3 * value_spread
                         if length(same_month_idx) >= 2
                             trend_slope = (same_month_vals[end] - same_month_vals[1]) /
                                          (same_month_idx[end] - same_month_idx[1])
                             nearest_idx = same_month_idx[argmin(abs.(same_month_idx .- i))]
-                            xu[i] = origx[nearest_idx] + trend_slope * (i - nearest_idx)
+                            working[i] = original[nearest_idx] + trend_slope * (i - nearest_idx)
                         else
-                            xu[i] = seasonal_mean
+                            working[i] = seasonal_mean
                         end
                     end
                 end
@@ -311,37 +311,37 @@ function interpolate_missing(x::AbstractVector{T};
         end
 
         try
-            mstl_fit = mstl(xu, freq; robust=true)
+            mstl_fit = mstl(working, freq; robust=true)
 
-            seas_total = if isempty(mstl_fit.seasonals)
+            total_seasonal = if isempty(mstl_fit.seasonals)
                 zeros(n)
             else
                 reduce(+, mstl_fit.seasonals)
             end
-            sa = xu .- seas_total
+            seasonally_adjusted = working .- total_seasonal
 
-            result = approx(idx, sa[idx]; xout=collect(tt), rule=(2, 2))
-            sa_interp = result.y
+            result = interpolate_xy(idx, seasonally_adjusted[idx]; xout=collect(tt), rule=(2, 2))
+            sa_interpolated = result.y
 
-            xu[missng] .= sa_interp[missng] .+ seas_total[missng]
+            working[is_missing] .= sa_interpolated[is_missing] .+ total_seasonal[is_missing]
         catch e
-            result = approx(idx, origx[idx]; xout=collect(tt), rule=(2, 2))
-            xu = result.y
+            result = interpolate_xy(idx, original[idx]; xout=collect(tt), rule=(2, 2))
+            working = result.y
         end
     end
 
     if !isnothing(λ)
-        xu = inv_box_cox(xu; lambda=λ)
+        working = inv_box_cox(working; lambda=λ)
     end
 
     if !use_linear
-        xu_max, xu_min = maximum(xu), minimum(xu)
-        if xu_max > rangex[2] + 0.5 * drangex || xu_min < rangex[1] - 0.5 * drangex
-            return interpolate_missing(origx; m=m, lambda=lambda, linear=true)
+        working_max, working_min = maximum(working), minimum(working)
+        if working_max > value_range[2] + 0.5 * value_spread || working_min < value_range[1] - 0.5 * value_spread
+            return interpolate_missing(original; m=m, lambda=lambda, linear=true)
         end
     end
 
-    return xu
+    return working
 end
 
 """

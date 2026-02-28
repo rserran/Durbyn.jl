@@ -1,8 +1,11 @@
 """
-    embed(x::AbstractVector, dimension::Integer=1) -> Matrix
-    embed(x::AbstractMatrix, dimension::Integer=1) -> Matrix
+    time_delay_embed(x::AbstractVector, dimension::Integer=1) -> Matrix
+    time_delay_embed(x::AbstractMatrix, dimension::Integer=1) -> Matrix
 
 Construct a time-delay embedding of a vector or each column of a matrix.
+
+This is a delay-coordinate embedding as used in state-space reconstruction
+(Takens' theorem) and lagged feature construction for AR/ARIMA-style models.
 
 # Arguments
 - `x`: A vector or a 2D matrix.
@@ -20,8 +23,8 @@ Construct a time-delay embedding of a vector or each column of a matrix.
   `col1_lag_d, col2_lag_d, …, colp_lag_d, col1_lag_(d-1), …, colp_lag_(d-1), …, col1_lag_1, …, colp_lag_1`.
 
 # Value
-A dense `Matrix` whose element type matches `x`'s element type.  
-For vectors: size `(n - d + 1, d)`.  
+A dense `Matrix` whose element type matches `x`'s element type.
+For vectors: size `(n - d + 1, d)`.
 For matrices: size `(n - d + 1, d * p)`.
 
 # Errors
@@ -39,7 +42,7 @@ the number of rows/elements of `x`.
 ```julia
 julia> x = [1, 2, 3, 4, 5];
 
-julia> embed(x, 2)
+julia> time_delay_embed(x, 2)
 4x2 Matrix{Int64}:
  2  1
  3  2
@@ -48,7 +51,7 @@ julia> embed(x, 2)
 
 julia> X = [1 10; 2 20; 3 30; 4 40];
 
-julia> embed(X, 2)  # size: (4-2+1) x (2*2) == 3 x 4
+julia> time_delay_embed(X, 2)  # size: (4-2+1) x (2*2) == 3 x 4
 3x4 Matrix{Int64}:
  2  20  1  10
  3  30  2  20
@@ -56,34 +59,34 @@ julia> embed(X, 2)  # size: (4-2+1) x (2*2) == 3 x 4
 # columns: col1_lag2, col2_lag2, col1_lag1, col2_lag1
 ```
 """
-function embed(x::AbstractVector{T}, dimension::Integer=1) where {T}
+function time_delay_embed(x::AbstractVector{T}, dimension::Integer=1) where {T}
     n = length(x)
     d = dimension
     if d < 1 || d > n
         throw(ArgumentError("wrong embedding dimension"))
     end
     m = n - d + 1
-    y = Matrix{T}(undef, m, d)
+    result = Matrix{T}(undef, m, d)
     for k in 1:d
         start = d - k + 1
-        y[:, k] = view(x, start : start + m - 1)
+        result[:, k] = view(x, start : start + m - 1)
     end
-    return y
+    return result
 end
 
-function embed(x::AbstractMatrix{T}, dimension::Integer=1) where {T}
+function time_delay_embed(x::AbstractMatrix{T}, dimension::Integer=1) where {T}
     n, p = size(x)
     d = dimension
     if d < 1 || d > n
         throw(ArgumentError("wrong embedding dimension"))
     end
     rows = n - d + 1
-    y = Matrix{T}(undef, rows, d * p)
+    output = Matrix{T}(undef, rows, d * p)
     for j in 1:p
-        col_embed = embed(view(x, :, j), d)
+        col_result = time_delay_embed(view(x, :, j), d)
         for k in 1:d
-            y[:, j + (k - 1) * p] = view(col_embed, :, k)
+            output[:, j + (k - 1) * p] = view(col_result, :, k)
         end
     end
-    return y
+    return output
 end

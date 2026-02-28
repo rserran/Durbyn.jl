@@ -8,31 +8,31 @@ function _nanstd(v)
     length(vals) < 2 ? NaN : std(vals)
 end
 
-function guer_cv(lam::Float64, x::Vector{Float64}, m::Int; nonseasonal_length::Int=2)
+function _guerrero_cv(lam::Float64, x::Vector{Float64}, m::Int; nonseasonal_length::Int=2)
     period = max(nonseasonal_length, m)
-    nobsf = length(x)
-    nyr = div(nobsf, period)
-    nobst = nyr * period
-    x_mat = reshape(x[(end-nobst+1):end], period, nyr)
-    x_mean = [_nanmean(x_mat[:, j]) for j in 1:nyr]
-    x_sd = [_nanstd(x_mat[:, j]) for j in 1:nyr]
-    x_rat = x_sd ./ x_mean .^ (1 - lam)
-    valid_rat = filter(!isnan, x_rat)
-    length(valid_rat) < 2 && return Inf
-    return _nanstd(valid_rat) / _nanmean(valid_rat)
+    n_obs = length(x)
+    n_years = div(n_obs, period)
+    n_trimmed = n_years * period
+    period_matrix = reshape(x[(end-n_trimmed+1):end], period, n_years)
+    period_means = [_nanmean(period_matrix[:, j]) for j in 1:n_years]
+    period_sds = [_nanstd(period_matrix[:, j]) for j in 1:n_years]
+    cv_ratios = period_sds ./ period_means .^ (1 - lam)
+    valid_ratios = filter(!isnan, cv_ratios)
+    length(valid_ratios) < 2 && return Inf
+    return _nanstd(valid_ratios) / _nanmean(valid_ratios)
 end
 
-function guerrero(x::AbstractVector{<:Number}, m::Int, lower::Real=-1.0, upper::Real=2.0, nonseasonal_length::Int=2)
-    xf = Vector{Float64}([ismissing(v) ? NaN : Float64(v) for v in x])
-    if any(v -> !isnan(v) && v <= 0, xf)
+function _guerrero_lambda(x::AbstractVector{<:Number}, m::Int, lower::Real=-1.0, upper::Real=2.0, nonseasonal_length::Int=2)
+    x_float = Vector{Float64}([ismissing(v) ? NaN : Float64(v) for v in x])
+    if any(v -> !isnan(v) && v <= 0, x_float)
         println("Warning: Guerrero's method for selecting a Box-Cox parameter (lambda) is given for strictly positive data.")
     end
 
-    result = Optimize.brent(lam -> guer_cv(lam, xf, m, nonseasonal_length=nonseasonal_length), Float64(lower), Float64(upper))
+    result = Optimize.brent(lam -> _guerrero_cv(lam, x_float, m, nonseasonal_length=nonseasonal_length), Float64(lower), Float64(upper))
     return result.x_opt
 end
 
-function qr_residuals(X, y)
+function _qr_residuals(X, y)
     Q, R = qr(X)
     a = Q' * y
     b = R \ a[1:size(R, 2)]
@@ -40,17 +40,17 @@ function qr_residuals(X, y)
     return y .- c
 end
 
-function bcloglik(x::AbstractArray, m::Int; lower::Float64 = -1.0, upper::Float64 = 2.0, is_ts::Bool = true)
+function _box_cox_loglik(x::AbstractArray, m::Int; lower::Float64 = -1.0, upper::Float64 = 2.0, is_ts::Bool = true)
     n_orig = length(x)
     good = [!ismissing(v) && !(v isa AbstractFloat && isnan(v)) for v in x]
-    xc = Vector{Float64}([Float64(x[i]) for i in 1:n_orig if good[i]])
+    x_clean = Vector{Float64}([Float64(x[i]) for i in 1:n_orig if good[i]])
 
-    if any(xc .<= 0)
+    if any(x_clean .<= 0)
         throw(DomainError(x, "Box-Cox transformation requires positive values"))
     end
 
-    logx = log.(xc)
-    xdot = exp(mean(logx))
+    logx = log.(x_clean)
+    geometric_mean = exp(mean(logx))
 
     if !is_ts
         X_full = ones(n_orig, 1)
@@ -70,24 +70,24 @@ function bcloglik(x::AbstractArray, m::Int; lower::Float64 = -1.0, upper::Float6
 
     X = X_full[good, :]
 
-    λs = collect(lower:0.05:upper)
-    loglik = similar(λs)
+    lambda_grid = collect(lower:0.05:upper)
+    loglik = similar(lambda_grid)
 
-    for (i, λ) in enumerate(λs)
+    for (i, λ) in enumerate(lambda_grid)
         xt = if abs(λ) > 0.02
-            (xc .^ λ .- 1) ./ λ
+            (x_clean .^ λ .- 1) ./ λ
         else
             logx .* (1 .+ (λ .* logx)/2 .* (1 .+ (λ .* logx)/3 .* (1 .+ (λ .* logx)/4)))
         end
 
-        z = xt ./ xdot^(λ - 1)
+        z = xt ./ geometric_mean^(λ - 1)
         β = X \ z
         r = z .- X*β
 
         loglik[i] = -n_orig/2 * log(sum(abs2, r))
     end
 
-    return λs[argmax(loglik)]
+    return lambda_grid[argmax(loglik)]
 end
 
 """
@@ -105,7 +105,7 @@ where λ minimizes the coefficient of variation for subseries of `x`.
 - `method::Symbol`: Choose the method to be used in calculating λ. Options are `:guerrero` or `:loglik`.
 - `lower::Float64`: Lower limit for possible λ values.
 - `upper::Float64`: Upper limit for possible λ values.
-- `nonseasonal_length::Int` Lenght of non-seasonal componants. Do not need to change.
+- `nonseasonal_length::Int` Length of non-seasonal components. Do not need to change.
 - `is_ts::Bool` Is data time series?
 
 # Details
@@ -118,9 +118,10 @@ a linear time trend is fitted while for seasonal data, a linear
 A number indicating the Box-Cox transformation parameter.
 
 # References
-- Box, G. E. P. and Cox, D. R. (1964). An analysis of transformations. 
+- Hyndman, R. J. & Athanasopoulos, G. (2021). *Forecasting: Principles and Practice* (3rd ed), OTexts. <https://otexts.com/fpp3/>
+- Box, G. E. P. and Cox, D. R. (1964). An analysis of transformations.
 JRSS B, 26, 211–246.
-- Guerrero, V.M. (1993). Time-series analysis supported by power 
+- Guerrero, V.M. (1993). Time-series analysis supported by power
 transformations. Journal of Forecasting, 12, 37–48.
 """
 
@@ -136,9 +137,9 @@ function box_cox_lambda(x::AbstractVector{<:Number}, m::Int;
     end
 
     if method === :loglik
-        return bcloglik(x, m, lower=lower, upper=upper, is_ts=is_ts)
+        return _box_cox_loglik(x, m, lower=lower, upper=upper, is_ts=is_ts)
     elseif method === :guerrero
-        return guerrero(x, m, lower, upper, nonseasonal_length)
+        return _guerrero_lambda(x, m, lower, upper, nonseasonal_length)
     else
         throw(ArgumentError("Unknown method: $method. Choose either :loglik or :guerrero."))
     end
@@ -157,8 +158,14 @@ with a lower bound of -0.9.
 
 # Details
 The Box-Cox transformation as given by Bickel & Doksum 1981.
+
 # Returns
 A numeric vector of the same length as `x`.
+
+# References
+- Hyndman, R. J. & Athanasopoulos, G. (2021). *Forecasting: Principles and Practice* (3rd ed), OTexts. <https://otexts.com/fpp3/>
+- Box, G. E. P. and Cox, D. R. (1964). An analysis of transformations. JRSS B, 26, 211–246.
+- Bickel, P. J. and Doksum, K. A. (1981). An Analysis of Transformations Revisited. JASA, 76, 296–311.
 """
 function box_cox(x::AbstractVector{<:Number}, m::Int; lambda::Union{Symbol,Number}=:auto)
     x = copy(x)
@@ -242,8 +249,9 @@ A numeric vector of the same length as `x`.
 
 
 # References
+- Hyndman, R. J. & Athanasopoulos, G. (2021). *Forecasting: Principles and Practice* (3rd ed), OTexts. <https://otexts.com/fpp3/>
 - Box, G. E. P. and Cox, D. R. (1964). An analysis of transformations. JRSS B, 26, 211–246.
-- Bickel, P. J. and Doksum K. A. (1981). An Analysis of Transformations Revisited. JASA, 76, 296-311.
+- Bickel, P. J. and Doksum, K. A. (1981). An Analysis of Transformations Revisited. JASA, 76, 296–311.
 """
 function inv_box_cox(x::AbstractArray; lambda::Real, biasadj::Union{Bool,Nothing}=false,
     fvar::Union{Nothing,Number,AbstractArray,Dict,NamedTuple}=nothing)
@@ -262,8 +270,8 @@ function inv_box_cox(x::AbstractArray; lambda::Real, biasadj::Union{Bool,Nothing
     if lambda == 0
         out .= exp.(x_work)
     else
-        xx = x_work .* lambda .+ 1
-        out .= sign.(xx) .* abs.(xx).^(1 / lambda)
+        scaled = x_work .* lambda .+ 1
+        out .= sign.(scaled) .* abs.(scaled).^(1 / lambda)
     end
 
     if isnothing(biasadj) || !(biasadj isa Bool)
@@ -272,16 +280,16 @@ function inv_box_cox(x::AbstractArray; lambda::Real, biasadj::Union{Bool,Nothing
     end
 
     if biasadj
-        fvar_local = fvar
-        isnothing(fvar_local) && throw(ArgumentError("fvar must be provided when biasadj=true"))
+        forecast_variance = fvar
+        isnothing(forecast_variance) && throw(ArgumentError("fvar must be provided when biasadj=true"))
 
-        if (fvar_local isa Dict) || (fvar_local isa NamedTuple)
-            level = maximum(fvar_local[:level])
-            upper = fvar_local[:upper]
-            lower = fvar_local[:lower]
+        if (forecast_variance isa Dict) || (forecast_variance isa NamedTuple)
+            level = maximum(forecast_variance[:level])
+            upper = forecast_variance[:upper]
+            lower = forecast_variance[:lower]
 
             if ndims(upper) == 2 && ndims(lower) == 2 && size(upper,2) > 1 && size(lower,2) > 1
-                lvlvec = fvar_local[:level]
+                lvlvec = forecast_variance[:level]
                 idx = findfirst(==(level), lvlvec)
                 isnothing(idx) && throw(ArgumentError("Requested level $level not found in fvar[:level]"))
                 upper = upper[:, idx]
@@ -294,30 +302,30 @@ function inv_box_cox(x::AbstractArray; lambda::Real, biasadj::Union{Bool,Nothing
             level = mean((level, 1.0))
 
             q = dist_quantile(Normal(), level)
-            fvar_local = ((upper .- lower) ./ (q * 2)) .^ 2
+            forecast_variance = ((upper .- lower) ./ (q * 2)) .^ 2
         end
 
-        if fvar_local isa AbstractMatrix && size(fvar_local, 2) > 1
-            n = min(size(fvar_local,1), size(fvar_local,2))
-            fvar_local = [fvar_local[i, i] for i in 1:n] 
+        if forecast_variance isa AbstractMatrix && size(forecast_variance, 2) > 1
+            n = min(size(forecast_variance,1), size(forecast_variance,2))
+            forecast_variance = [forecast_variance[i, i] for i in 1:n]
         end
 
-        fvar_bc = fvar_local
-        if fvar_local isa AbstractVector
-            L = length(fvar_local)
+        variance_adjusted = forecast_variance
+        if forecast_variance isa AbstractVector
+            L = length(forecast_variance)
             N = length(out)
             if L == 0
                 throw(ArgumentError("fvar vector is empty"))
             end
             reps = cld(N, L)
-            flat = repeat(fvar_local, reps)[1:N]
-            fvar_bc = reshape(flat, size(out))
-        elseif !(fvar_local isa Number) && !(size(fvar_local) == size(out))
-            
-            throw(DimensionMismatch("fvar shape $(size(fvar_local)) is incompatible with out shape $(size(out)). Provide a vector for R-style recycling or a same-shaped array."))
+            flat = repeat(forecast_variance, reps)[1:N]
+            variance_adjusted = reshape(flat, size(out))
+        elseif !(forecast_variance isa Number) && !(size(forecast_variance) == size(out))
+
+            throw(DimensionMismatch("fvar shape $(size(forecast_variance)) is incompatible with out shape $(size(out)). Provide a vector for R-style recycling or a same-shaped array."))
         end
 
-        out .*= (1 .+ 0.5 .* fvar_bc .* (1 .- lambda) ./ (out .^ (2 * lambda)))
+        out .*= (1 .+ 0.5 .* variance_adjusted .* (1 .- lambda) ./ (out .^ (2 * lambda)))
     end
 
     return out

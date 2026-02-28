@@ -5,7 +5,7 @@ Container for the results of an ACF (Autocorrelation Function) computation.
 
 # Fields
 - `values::Vector{Float64}`: ACF values at each lag (including lag 0)
-- `lags::Vector{Int}`: Lag indices (0, 1, 2, ..., nlags)
+- `lags::Vector{Int}`: Lag indices (0, 1, 2, ..., n_lags)
 - `n::Int`: Length of the original time series
 - `m::Int`: Frequency/seasonal period of the data
 - `ci::Float64`: Critical value for 95% confidence interval (±1.96/√n)
@@ -33,8 +33,8 @@ end
 Container for the results of a PACF (Partial Autocorrelation Function) computation.
 
 # Fields
-- `values::Vector{Float64}`: PACF values at each lag (lags 1, 2, ..., nlags)
-- `lags::Vector{Int}`: Lag indices (1, 2, ..., nlags)
+- `values::Vector{Float64}`: PACF values at each lag (lags 1, 2, ..., n_lags)
+- `lags::Vector{Int}`: Lag indices (1, 2, ..., n_lags)
 - `n::Int`: Length of the original time series
 - `m::Int`: Frequency/seasonal period of the data
 - `ci::Float64`: Critical value for 95% confidence interval (±1.96/√n)
@@ -57,14 +57,14 @@ struct PACFResult
 end
 
 """
-    acf(y, m, nlags=nothing; demean=true) -> ACFResult
+    acf(y, m, n_lags=nothing; demean=true) -> ACFResult
 
 Compute the sample autocorrelation function (ACF) of a time series.
 
 # Arguments
 - `y::AbstractVector`: Input time series
 - `m::Int`: Frequency/seasonal period of the data
-- `nlags::Union{Int,Nothing}=nothing`: Number of lags to compute. If `nothing`,
+- `n_lags::Union{Int,Nothing}=nothing`: Number of lags to compute. If `nothing`,
   defaults to `min(10*log10(n), n-1)` following R's convention.
 - `demean::Bool=true`: Whether to subtract the mean before computing ACF
 
@@ -90,46 +90,46 @@ plot(result)
 - Box, G. E. P., Jenkins, G. M., Reinsel, G. C., & Ljung, G. M. (2015).
   Time Series Analysis: Forecasting and Control. Wiley.
 """
-function acf(y::AbstractVector{T}, m::Int, nlags::Union{Int,Nothing}=nothing; demean::Bool=true) where T<:Real
+function acf(y::AbstractVector{T}, m::Int, n_lags::Union{Int,Nothing}=nothing; demean::Bool=true) where T<:Real
     n = length(y)
 
-    if isnothing(nlags)
-        nlags = min(floor(Int, 10 * log10(n)), n - 1)
+    if isnothing(n_lags)
+        n_lags = min(floor(Int, 10 * log10(n)), n - 1)
     end
 
-    if nlags < 0
-        throw(ArgumentError("nlags must be non-negative"))
+    if n_lags < 0
+        throw(ArgumentError("n_lags must be non-negative"))
     end
-    if nlags >= n
-        throw(ArgumentError("nlags must be less than length of series"))
+    if n_lags >= n
+        throw(ArgumentError("n_lags must be less than length of series"))
     end
     if m < 1
         throw(ArgumentError("frequency m must be at least 1"))
     end
 
     y_centered = demean ? y .- mean(y) : y
-    c0 = sum(y_centered .^ 2) / n
+    variance = sum(y_centered .^ 2) / n
 
-    if c0 == 0
-        values = ones(Float64, nlags + 1)
+    if variance == 0
+        values = ones(Float64, n_lags + 1)
     else
-        values = zeros(Float64, nlags + 1)
+        values = zeros(Float64, n_lags + 1)
         values[1] = 1.0
 
-        for k in 1:nlags
-            ck = sum(y_centered[1:n-k] .* y_centered[k+1:n]) / n
-            values[k + 1] = ck / c0
+        for k in 1:n_lags
+            autocovariance = sum(y_centered[1:n-k] .* y_centered[k+1:n]) / n
+            values[k + 1] = autocovariance / variance
         end
     end
 
-    lags = collect(0:nlags)
+    lags = collect(0:n_lags)
     ci = 1.96 / sqrt(n)
 
     return ACFResult(values, lags, n, m, ci, :acf)
 end
 
 """
-    pacf(y, m, nlags=nothing) -> PACFResult
+    pacf(y, m, n_lags=nothing) -> PACFResult
 
 Compute the sample partial autocorrelation function (PACF) of a time series
 using the Durbin-Levinson algorithm.
@@ -137,7 +137,7 @@ using the Durbin-Levinson algorithm.
 # Arguments
 - `y::AbstractVector`: Input time series
 - `m::Int`: Frequency/seasonal period of the data
-- `nlags::Union{Int,Nothing}=nothing`: Number of lags to compute. If `nothing`,
+- `n_lags::Union{Int,Nothing}=nothing`: Number of lags to compute. If `nothing`,
   defaults to `min(10*log10(n), n-1)` following R's convention.
 
 # Returns
@@ -151,54 +151,60 @@ result.values
 result.lags
 plot(result)
 ```
+
+# References
+- Box, G. E. P., Jenkins, G. M., Reinsel, G. C., & Ljung, G. M. (2015).
+  Time Series Analysis: Forecasting and Control. Wiley.
+- Durbin, J. (1960). The fitting of time-series models. *Revue de l'Institut
+  International de Statistique*, 28(3), 233-244.
 """
-function pacf(y::AbstractVector{T}, m::Int, nlags::Union{Int,Nothing}=nothing) where T<:Real
+function pacf(y::AbstractVector{T}, m::Int, n_lags::Union{Int,Nothing}=nothing) where T<:Real
     n = length(y)
 
-    if isnothing(nlags)
-        nlags = min(floor(Int, 10 * log10(n)), n - 1)
+    if isnothing(n_lags)
+        n_lags = min(floor(Int, 10 * log10(n)), n - 1)
     end
 
-    if nlags < 1
-        throw(ArgumentError("nlags must be at least 1"))
+    if n_lags < 1
+        throw(ArgumentError("n_lags must be at least 1"))
     end
-    if nlags >= n
-        throw(ArgumentError("nlags must be less than length of series"))
+    if n_lags >= n
+        throw(ArgumentError("n_lags must be less than length of series"))
     end
     if m < 1
         throw(ArgumentError("frequency m must be at least 1"))
     end
 
-    acf_result = acf(y, m, nlags)
-    r = acf_result.values
+    acf_result = acf(y, m, n_lags)
+    acf_values = acf_result.values
 
-    pacf_vals = zeros(Float64, nlags)
-    phi = zeros(Float64, nlags, nlags)
+    pacf_vals = zeros(Float64, n_lags)
+    coefficients = zeros(Float64, n_lags, n_lags)
 
-    phi[1, 1] = r[2]
-    pacf_vals[1] = phi[1, 1]
+    coefficients[1, 1] = acf_values[2]
+    pacf_vals[1] = coefficients[1, 1]
 
-    for k in 2:nlags
-        num = r[k + 1]
-        den = 1.0
+    for k in 2:n_lags
+        numerator = acf_values[k + 1]
+        denominator = 1.0
         for j in 1:k-1
-            num -= phi[k-1, j] * r[k - j + 1]
-            den -= phi[k-1, j] * r[j + 1]
+            numerator -= coefficients[k-1, j] * acf_values[k - j + 1]
+            denominator -= coefficients[k-1, j] * acf_values[j + 1]
         end
 
-        if abs(den) < 1e-10
-            phi[k, k] = 0.0
+        if abs(denominator) < 1e-10
+            coefficients[k, k] = 0.0
         else
-            phi[k, k] = num / den
+            coefficients[k, k] = numerator / denominator
         end
-        pacf_vals[k] = phi[k, k]
+        pacf_vals[k] = coefficients[k, k]
 
         for j in 1:k-1
-            phi[k, j] = phi[k-1, j] - phi[k, k] * phi[k-1, k-j]
+            coefficients[k, j] = coefficients[k-1, j] - coefficients[k, k] * coefficients[k-1, k-j]
         end
     end
 
-    lags = collect(1:nlags)
+    lags = collect(1:n_lags)
     ci = 1.96 / sqrt(n)
 
     return PACFResult(pacf_vals, lags, n, m, ci, :pacf)

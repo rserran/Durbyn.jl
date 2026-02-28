@@ -6,8 +6,8 @@ import Durbyn.Stats: acf, pacf, ACFResult, PACFResult
 import Durbyn.Stats: box_cox, box_cox!, inv_box_cox, box_cox_lambda
 import Durbyn.Stats: decompose, DecomposedTimeSeries
 import Durbyn.Stats: adf, ADF, kpss, KPSS, ocsb, OCSB
-import Durbyn.Stats: embed, diff, fourier, ndiffs, nsdiffs
-import Durbyn.Stats: ols, OlsFit, approx, approxfun, seasonal_strength, modelrank
+import Durbyn.Stats: time_delay_embed, diff, fourier, ndiffs, nsdiffs
+import Durbyn.Stats: ols, OlsFit, interpolate_xy, make_interpolator, seasonal_strength, modelrank
 import Durbyn.Stats: interpolate_missing, longest_contiguous, check_missing
 import Durbyn.Stats: stl, STLResult
 import Durbyn.Stats: mstl, MSTLResult
@@ -333,11 +333,11 @@ const REF_KPSS_STAT_AP = 2.8767
         end
     end
 
-    @testset "embed function" begin
+    @testset "time_delay_embed function" begin
         x = collect(1.0:10.0)
 
         @testset "Basic embedding" begin
-            result = embed(x, 3)
+            result = time_delay_embed(x, 3)
 
             @test size(result) == (8, 3)
             @test result[1, :] == [3.0, 2.0, 1.0]
@@ -345,7 +345,7 @@ const REF_KPSS_STAT_AP = 2.8767
         end
 
         @testset "Embedding dimension 1" begin
-            result = embed(x, 1)
+            result = time_delay_embed(x, 1)
             @test size(result) == (10, 1)
             @test vec(result) == x
         end
@@ -448,19 +448,19 @@ const REF_KPSS_STAT_AP = 2.8767
         end
     end
 
-    @testset "approx and approxfun (interpolation)" begin
+    @testset "interpolate_xy and make_interpolator (interpolation)" begin
         x = [1.0, 2.0, 4.0, 5.0]
         y = [1.0, 4.0, 16.0, 25.0]
 
         @testset "Linear interpolation" begin
-            result = approx(x, y; xout=[1.5, 3.0, 4.5])
+            result = interpolate_xy(x, y; xout=[1.5, 3.0, 4.5])
 
             @test abs(result.y[1] - 2.5) <= EPS_SCALAR
             @test abs(result.y[2] - 10.0) <= EPS_SCALAR
         end
 
-        @testset "approxfun returns function" begin
-            f = approxfun(x, y)
+        @testset "make_interpolator returns function" begin
+            f = make_interpolator(x, y)
 
             @test f(1.0) ≈ 1.0
             @test f(2.0) ≈ 4.0
@@ -890,8 +890,8 @@ const REF_KPSS_STAT_AP = 2.8767
 
     @testset "Round 2 Bug Fixes + R Parity" begin
 
-        @testset "ndiffs positional-API passes deterministic and maxd correctly" begin
-            @test ndiffs(AirPassengers; test=:kpss, deterministic=:level, maxd=0) == 0
+        @testset "ndiffs positional-API passes deterministic and max_d correctly" begin
+            @test ndiffs(AirPassengers; test=:kpss, deterministic=:level, max_d=0) == 0
 
             @test ndiffs(AirPassengers; test=:kpss, deterministic=:level) == 1
 
@@ -950,18 +950,18 @@ const REF_KPSS_STAT_AP = 2.8767
             @test check_missing([1.0, 2.0, 3.0]) == [1.0, 2.0, 3.0]
         end
 
-        @testset "approx handles missing with na_rm=false" begin
+        @testset "interpolate_xy handles missing with na_rm=false" begin
 
-            r = approx([1.0, 2.0, 3.0], Union{Float64,Missing}[missing, 2.0, 3.0];
+            r = interpolate_xy([1.0, 2.0, 3.0], Union{Float64,Missing}[missing, 2.0, 3.0];
                        na_rm=false, xout=[2.5])
             @test length(r.y) == 1
             @test !ismissing(r.y[1])
 
-            r2 = approx([1.0, 2.0, 3.0], Union{Float64,Missing}[missing, 2.0, 3.0];
+            r2 = interpolate_xy([1.0, 2.0, 3.0], Union{Float64,Missing}[missing, 2.0, 3.0];
                         xout=[2.5])
             @test r2.y[1] ≈ 2.5
 
-            r3 = approx([1.0, 2.0, 3.0], Union{Float64,Missing}[missing, 2.0, 3.0];
+            r3 = interpolate_xy([1.0, 2.0, 3.0], Union{Float64,Missing}[missing, 2.0, 3.0];
                         xout=[1.5, 2.5], rule=1, na_rm=false)
             @test isnan(r3.y[1])
             @test r3.y[2] ≈ 2.5

@@ -51,7 +51,7 @@ Perform the Augmented Dickey-Fuller (ADF) unit-root test.
 
 The ADF test augments the basic Dickey-Fuller regression with lagged
 differences of the series to correct for serial correlation. The test
-can be run without deterministic terms, with an intercept (“drift”),
+can be run without deterministic terms, with an intercept ("drift"),
 or with an intercept and linear trend.
 
 # Arguments
@@ -117,58 +117,58 @@ function adf(y; type::Symbol=:none, lags::Int=1, selectlags::Symbol=:fixed)
     selectlags ∈ (:fixed, :aic, :bic) || throw(ArgumentError("selectlags must be :fixed, :aic, or :bic"))
 
     yv = _skipmissing_to_vec(y)
-    (nd,) = size(yv)
-    nd > 1 || throw(ArgumentError("y is not a vector or too short"))
+    (n_data,) = size(yv)
+    n_data > 1 || throw(ArgumentError("y is not a vector or too short"))
     any(isnan.(yv)) && throw(ArgumentError("NAs in y"))
 
     lag = Int(lags)
     lag >= 0 || throw(ArgumentError("lags must be a nonnegative integer"))
 
-    L = lag + 1
+    augmentation_order = lag + 1
     z = diff(yv)
     z = _skipmissing_to_vec(z)
     n = length(z)
-    n >= L || throw(ArgumentError("Not enough observations for the requested lags"))
+    n >= augmentation_order || throw(ArgumentError("Not enough observations for the requested lags"))
 
-    x = embed(z, L)
-    T = size(x, 1)
-    z_diff  = x[:, 1]
-    z_lag_1 = yv[L:n]
-    tt      = collect(L:(L + T - 1))
+    x = time_delay_embed(z, augmentation_order)
+    n_obs = size(x, 1)
+    delta_y  = x[:, 1]
+    y_lagged = yv[augmentation_order:n]
+    time_index = collect(augmentation_order:(augmentation_order + n_obs - 1))
 
     function _run_adf(chosen_L::Int)
         if chosen_L > 1
             z_diff_lag = x[:, 2:chosen_L]
-            K = size(z_diff_lag, 2)
+            n_lag_cols = size(z_diff_lag, 2)
         else
-            z_diff_lag = Array{Float64}(undef, T, 0)
-            K = 0
+            z_diff_lag = Array{Float64}(undef, n_obs, 0)
+            n_lag_cols = 0
         end
 
         if type == :none
-            X = hcat(z_lag_1, z_diff_lag)
-            fit = _ols(z_diff, X)
+            X = hcat(y_lagged, z_diff_lag)
+            fit = _ols(delta_y, X)
             β, se, res = fit.β, fit.se, fit.residuals
             tau = β[1] / se[1]
-            
+
             TS = NamedMatrix(1, ["tau1"]; T=Float64, rownames=["statistic"])
             TS.data[1, 1] = tau
             return (fit=fit, res=res, teststat=TS, p=length(β), X=X)
 
         elseif type == :drift
-            X = hcat(ones(Float64, T), z_lag_1, z_diff_lag)
-            fit = _ols(z_diff, X)
+            X = hcat(ones(Float64, n_obs), y_lagged, z_diff_lag)
+            fit = _ols(delta_y, X)
             β, se, res = fit.β, fit.se, fit.residuals
             tau = β[2] / se[2]
 
             Xr = z_diff_lag
             if size(Xr,2) == 0
-                Xr = ones(Float64, T, 0)
+                Xr = ones(Float64, n_obs, 0)
             end
-            fitR = _ols(z_diff, Xr)
+            fitR = _ols(delta_y, Xr)
             RSSr, dfr = sum(fitR.residuals.^2), fitR.df_residual
             RSSf, dff = sum(res.^2), fit.df_residual
-            phi1 = _ftest_R_vs_F(RSSr, dfr, RSSf, dff)
+            phi1 = _f_test_restricted_vs_full(RSSr, dfr, RSSf, dff)
 
             TS = NamedMatrix(1, ["tau2","phi1"]; T=Float64, rownames=["statistic"])
             TS.data[1, :] .= (tau, phi1)
@@ -176,22 +176,22 @@ function adf(y; type::Symbol=:none, lags::Int=1, selectlags::Symbol=:fixed)
             return (fit=fit, res=res, teststat=TS, p=length(β), X=X)
 
         else
-            X = hcat(ones(Float64, T), z_lag_1, Float64.(tt), z_diff_lag)
-            fit = _ols(z_diff, X)
+            X = hcat(ones(Float64, n_obs), y_lagged, Float64.(time_index), z_diff_lag)
+            fit = _ols(delta_y, X)
             β, se, res = fit.β, fit.se, fit.residuals
             tau = β[2] / se[2]
 
             Xr2 = z_diff_lag
             if size(Xr2,2) == 0
-                Xr2 = ones(Float64, T, 0)
+                Xr2 = ones(Float64, n_obs, 0)
             end
-            fitR2 = _ols(z_diff, Xr2)
-            phi2 = _ftest_R_vs_F(sum(fitR2.residuals.^2), fitR2.df_residual,
+            fitR2 = _ols(delta_y, Xr2)
+            phi2 = _f_test_restricted_vs_full(sum(fitR2.residuals.^2), fitR2.df_residual,
                                   sum(res.^2), fit.df_residual)
 
-            Xr3 = hcat(ones(Float64, T), z_diff_lag)
-            fitR3 = _ols(z_diff, Xr3)
-            phi3 = _ftest_R_vs_F(sum(fitR3.residuals.^2), fitR3.df_residual,
+            Xr3 = hcat(ones(Float64, n_obs), z_diff_lag)
+            fitR3 = _ols(delta_y, Xr3)
+            phi3 = _f_test_restricted_vs_full(sum(fitR3.residuals.^2), fitR3.df_residual,
                                   sum(res.^2), fit.df_residual)
 
             TS = NamedMatrix(1, ["tau3","phi2","phi3"]; T=Float64, rownames=["statistic"])
@@ -201,16 +201,16 @@ function adf(y; type::Symbol=:none, lags::Int=1, selectlags::Symbol=:fixed)
         end
     end
 
-    chosen_L = L
-    if L > 1 && selectlags != :fixed
-        critRes = fill(Inf, L)
-        kpen = selectlags == :aic ? 2.0 : log(length(z_diff))
-        for i in 2:L
+    chosen_L = augmentation_order
+    if augmentation_order > 1 && selectlags != :fixed
+        critRes = fill(Inf, augmentation_order)
+        kpen = selectlags == :aic ? 2.0 : log(length(delta_y))
+        for i in 2:augmentation_order
             out = _run_adf(i)
             RSS = sum(out.res .^ 2)
             nobs = length(out.res)
             p = out.p
-            critRes[i] = _ic(RSS, nobs, p, kpen)
+            critRes[i] = _information_criterion(RSS, nobs, p, kpen)
         end
         imin = argmin(critRes)
         if imin ≥ 2 && isfinite(critRes[imin])
@@ -220,12 +220,11 @@ function adf(y; type::Symbol=:none, lags::Int=1, selectlags::Symbol=:fixed)
 
     out = _run_adf(chosen_L)
 
-    Tn = T
-    rowsel = Tn < 25 ? 1 :
-             Tn < 50 ? 2 :
-             Tn < 100 ? 3 :
-             Tn < 250 ? 4 :
-             Tn < 500 ? 5 : 6
+    cv_row = n_obs < 25 ? 1 :
+             n_obs < 50 ? 2 :
+             n_obs < 100 ? 3 :
+             n_obs < 250 ? 4 :
+             n_obs < 500 ? 5 : 6
 
     function _cvals(type::Symbol, row::Int)
         if type == :none
@@ -290,7 +289,7 @@ function adf(y; type::Symbol=:none, lags::Int=1, selectlags::Symbol=:fixed)
         end
     end
 
-    cvals, names = _cvals(type, rowsel)
+    cvals, names = _cvals(type, cv_row)
     clevels = [0.01, 0.05, 0.10]
 
     return ADF(type, cvals, clevels, chosen_L - 1, out.teststat, out.fit, out.res, names)
@@ -302,17 +301,15 @@ function summary(x::ADF)
     "ADF(model=$(x.model), lag=$(x.lag), teststat=[$(vals)])"
 end
 
-_adf_model_desc(sym::Symbol) = sym === :nc ? "no constant (nc)" :
-                               sym === :c  ? "constant (c)" :
-                               sym === :ct ? "constant + trend (ct)" :
-                               sym === :ctt ? "constant + trend + trend² (ctt)" :
-                               string(sym)
-
 
 function show(io::IO, ::MIME"text/plain", x::ADF)
     println(io, "ADF (Augmented Dickey–Fuller) Unit Root Test")
 
-    println(io, "Deterministic component (model): ", _adf_model_desc(x.model))
+    desc = x.model === :none ? "none (no constant)" :
+           x.model === :drift ? "drift (intercept only)" :
+           x.model === :trend ? "trend (intercept + linear trend)" :
+           string(x.model)
+    println(io, "Deterministic component (model): ", desc)
     println(io, "Lag truncation (bandwidth): ", x.lag)
 
     println(io, "\nTest statistic(s):")
@@ -322,12 +319,12 @@ function show(io::IO, ::MIME"text/plain", x::ADF)
     if !isempty(x.cval) && !isempty(x.clevels) && size(x.cval, 2) == length(x.clevels)
         println(io, "\nCritical values:")
         levels_str = ["$(Int(round(100α)))%" for α in x.clevels]
-        
+
         rowlabels = (length(x.testnames) == size(x.cval, 1) && !isempty(x.testnames)) ?
                     string.(x.testnames) :
                     ["test$(i)" for i in 1:size(x.cval, 1)]
 
-        colw = maximum(length, ["level"; levels_str]) 
+        colw = maximum(length, ["level"; levels_str])
         valw = maximum(length, string.(round.(vec(x.cval); digits=4)))
 
         print(io, "  ", lpad("level", colw))
@@ -346,14 +343,14 @@ function show(io::IO, ::MIME"text/plain", x::ADF)
     end
 
     if hasproperty(x, :testreg) && !isnothing(x.testreg)
-        
+
         println(io, "\nRegression fields available in `x.testreg` (not shown).")
     end
 end
 
 function show(io::IO, x::ADF)
     if get(io, :compact, false)
-        
+
         v = try
             x.teststat[1]
         catch

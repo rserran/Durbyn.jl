@@ -215,7 +215,7 @@ function auto_arima(
     elseif isnothing(D) && length(xx) <= 2 * m
         D = 0
     elseif isnothing(D)
-        D = nsdiffs(xx, m; test = seasonal_test, maxD = max_D, seasonal_test_args...)
+        D = nsdiffs(xx, m; test = seasonal_test, max_D = max_D, seasonal_test_args...)
         # Ensure xreg not null after seasonal differencing
         if D > 0 && !isnothing(xregg)
             diffxreg = diff(xregg; differences = D, lag = m)
@@ -253,7 +253,7 @@ function auto_arima(
 
     # non-seasonal differencing choice
     if isnothing(d)
-        d = ndiffs(dx; test = test, maxd = max_d, test_args...)
+        d = ndiffs(dx; test = test, max_d = max_d, test_args...)
         # Ensure xreg not null after additional (non-seasonal) differencing
         if d > 0 && !isnothing(xregg)
             diffxreg = diff(diffxreg; differences = d, lag = 1)

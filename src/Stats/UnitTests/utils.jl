@@ -33,28 +33,28 @@ function _ols(y::AbstractVector{<:Real}, X::AbstractMatrix{<:Real})
     end
 end
 
-function _bartlett_LRV(res::Vector{Float64}, n::Int, lmax::Int)
-    if lmax == 0
+function _bartlett_lrv(res::Vector{Float64}, n::Int, max_lag::Int)
+    if max_lag == 0
         return nothing
     end
-    idx = 1:lmax
+    idx = 1:max_lag
     xcov = [dot(@view(res[(l+1):end]), @view(res[1:(end-l)])) for l in idx]
-    bartlett = 1 .- (idx ./ (lmax + 1))
+    bartlett = 1 .- (idx ./ (max_lag + 1))
     return (2 / n) * dot(bartlett, xcov)
 end
 
 function _pvalue_from_cvals(teststat::Float64, cvals::Vector{Float64}, probs::Vector{Float64})
     (length(cvals) == length(probs) && length(cvals) >= 2) || throw(ArgumentError("cvals and probs must have the same length and length ≥ 2"))
-    
+
     xs = collect(cvals)
     ys = collect(probs)
-    
+
     if teststat <= minimum(xs)
         return ys[argmin(xs)]
     elseif teststat >= maximum(xs)
         return ys[argmax(xs)]
     end
-    
+
     for i in 1:length(xs)-1
         x1, x2 = xs[i], xs[i+1]
         y1, y2 = ys[i], ys[i+1]
@@ -67,10 +67,10 @@ function _pvalue_from_cvals(teststat::Float64, cvals::Vector{Float64}, probs::Ve
 end
 
 
-_ic(RSS::Real, n::Int, p::Int, kpen::Real) = n * log(RSS / n) + kpen * p
+_information_criterion(RSS::Real, n::Int, p::Int, kpen::Real) = n * log(RSS / n) + kpen * p
 
 
-function _ftest_R_vs_F(RSSr::Real, dfr::Int, RSSf::Real, dff::Int)::Float64
+function _f_test_restricted_vs_full(RSSr::Real, dfr::Int, RSSf::Real, dff::Int)::Float64
     q = dfr - dff
     num = (RSSr - RSSf) / q
     den = RSSf / dff

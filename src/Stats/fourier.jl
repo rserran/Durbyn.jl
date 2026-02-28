@@ -1,17 +1,14 @@
-sinpi(x) = sin(pi * x)
-cospi(x) = cos(pi * x)
-
-function base_fourier(x, K, times, period)
+function _build_fourier_matrix(x, K, times, period)
     length(period) == length(K) || throw(ArgumentError("Number of periods does not match number of orders"))
 
     !any(2 .* K .> period) || throw(ArgumentError("K must not be greater than period/2"))
 
-    p = Float64[]
+    frequencies = Float64[]
     labels = String[]
 
     for j in eachindex(period)
         if K[j] > 0
-            append!(p, (1:K[j]) ./ period[j])
+            append!(frequencies, (1:K[j]) ./ period[j])
             # Interleaved labels: S1, C1, S2, C2, ...
             # Period suffix added only for multi-seasonal disambiguation
             suffix = length(period) > 1 ? string("-", round(Int, period[j])) : ""
@@ -23,28 +20,28 @@ function base_fourier(x, K, times, period)
     end
 
     # Remove duplicate frequencies (multi-seasonal)
-    k = duplicated(p)
-    p = p[.!k]
-    labels = labels[.!repeat(k, inner=2)]
+    is_duplicate = duplicated(frequencies)
+    frequencies = frequencies[.!is_duplicate]
+    labels = labels[.!repeat(is_duplicate, inner=2)]
 
     # Identify frequencies where sinpi=0 (K = period/2)
-    k = abs.(2 .* p .- round.(2 .* p)) .> eps(Float64)
+    has_sin_term = abs.(2 .* frequencies .- round.(2 .* frequencies)) .> eps(Float64)
 
-    X = fill(NaN, length(times), 2 * length(p))
+    matrix = fill(NaN, length(times), 2 * length(frequencies))
 
-    for j in eachindex(p)
-        if k[j]
-            X[:, 2 * j - 1] .= sinpi.(2 .* p[j] .* times)
+    for j in eachindex(frequencies)
+        if has_sin_term[j]
+            matrix[:, 2 * j - 1] .= sinpi.(2 .* frequencies[j] .* times)
         end
-        X[:, 2 * j] .= cospi.(2 .* p[j] .* times)
+        matrix[:, 2 * j] .= cospi.(2 .* frequencies[j] .* times)
     end
 
     # Remove NaN columns (skipped sin terms) and corresponding labels
-    valid_columns = vec(.!isnan.(sum(X, dims=1)))
-    X = X[:, valid_columns]
+    valid_columns = vec(.!isnan.(sum(matrix, dims=1)))
+    matrix = matrix[:, valid_columns]
     labels = labels[valid_columns]
 
-    return X, labels
+    return matrix, labels
 end
 """
     fourier(x::Vector{T}; m::Int, K::Int, h::Union{Int, Nothing}=nothing) -> NamedTuple
@@ -74,17 +71,20 @@ f_future = fourier(y; m=12, K=6, h=24) # NamedTuple with 11 entries
 data = merge((value = y,), f_train)
 newdata = f_future
 ```
+
+# References
+- Hyndman, R. J. & Athanasopoulos, G. (2021). *Forecasting: Principles and Practice* (3rd ed), OTexts.
 """
 function fourier(x::Vector{T}; m::Int, K::Int, h::Union{Int, Nothing}=nothing) where T
     if isnothing(h)
-        X, colnames = base_fourier(x, [K], 1:length(x), [m])
+        X, colnames = _build_fourier_matrix(x, [K], 1:length(x), [m])
         size(X, 1) == length(x) || throw(ArgumentError("Row dimension is wrong"))
     else
-        X, colnames = base_fourier(x, [K], length(x) .+ (1:h), [m])
+        X, colnames = _build_fourier_matrix(x, [K], length(x) .+ (1:h), [m])
         size(X, 1) == h || throw(ArgumentError("Row dimension is wrong"))
     end
 
-    keys = Tuple(Symbol.(colnames))
-    vals = Tuple(X[:, j] for j in 1:size(X, 2))
-    return NamedTuple{keys}(vals)
+    col_names = Tuple(Symbol.(colnames))
+    col_vectors = Tuple(X[:, j] for j in 1:size(X, 2))
+    return NamedTuple{col_names}(col_vectors)
 end
