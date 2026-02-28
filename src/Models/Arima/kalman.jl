@@ -1,4 +1,3 @@
-# helper for compute_arima_likelihood
 function state_prediction!(anew::AbstractArray, a::AbstractArray, p::Int, r::Int, d::Int, rd::Int, phi::AbstractArray, delta::AbstractArray)
      @inbounds for i in 1:r
         tmp = (i < r) ? a[i + 1] : 0.0
@@ -19,7 +18,7 @@ function state_prediction!(anew::AbstractArray, a::AbstractArray, p::Int, r::Int
         anew[r + 1] = tmp
     end
 end
-# helper for compute_arima_likelihood
+
 function predict_covariance_nodiff!(Pnew::Matrix{Float64}, P::Matrix{Float64},
     r::Int, p::Int, q::Int,
     phi::Vector{Float64}, theta::Vector{Float64})
@@ -63,12 +62,11 @@ function predict_covariance_nodiff!(Pnew::Matrix{Float64}, P::Matrix{Float64},
         end
     end
 end
-# helper for compute_arima_likelihood
+
 function predict_covariance_with_diff!(Pnew::Matrix{Float64}, P::Matrix{Float64},
     r::Int, d::Int, p::Int, q::Int, rd::Int,
     phi::Vector{Float64}, delta::Vector{Float64},
     theta::Vector{Float64}, mm::Matrix{Float64})
-    # Step 1: mm = T * P
     @inbounds for i in 1:r
         for j in 1:rd
             tmp = 0.0
@@ -96,8 +94,6 @@ function predict_covariance_with_diff!(Pnew::Matrix{Float64}, P::Matrix{Float64}
         end
     end
 
-    # Step 2: Pnew = mm * Tᵀ
-    # Column-major traversal: indices are transposed compared to row-major reading
     @inbounds for i in 1:r
         for j in 1:rd
             tmp = 0.0
@@ -125,7 +121,6 @@ function predict_covariance_with_diff!(Pnew::Matrix{Float64}, P::Matrix{Float64}
         end
     end
 
-    # Step 3: Add noise (MA(q))
     @inbounds for i in 1:(q+1)
         if i == 1
             vi = 1.0
@@ -143,17 +138,14 @@ function predict_covariance_with_diff!(Pnew::Matrix{Float64}, P::Matrix{Float64}
         end
     end
 end
-# helper for compute_arima_likelihood
-# This is a bit confusing: C code uses row major operations. Pnew[i + r * j]
+
 function kalman_update!(y_obs, anew, delta, Pnew, M, d, r, rd, a, P, useResid, rsResid, l, ssq, sumlog, nu,)
 
-    # 1) residual
     resid = y_obs - anew[1]
     @inbounds for i in 1:d
         resid = resid - delta[i] * anew[r+i]
     end
 
-    # 2) build M = Pnew * [1; delta]
     @inbounds for i in 1:rd
         tmp = Pnew[i, 1]
         for j in 1:d
@@ -162,32 +154,25 @@ function kalman_update!(y_obs, anew, delta, Pnew, M, d, r, rd, a, P, useResid, r
         M[i] = tmp
     end
 
-    # 3) compute gain = H* M
     gain = M[1]
     @inbounds for j in 1:d
         gain += delta[j] * M[r+j]
     end
 
-    # 4) update ssq, sumlog, nu if gain is "safe"
-    #    Guard gain > 0: C's log(negative) returns NaN silently;
-    #    Julia throws DomainError. Use NaN to match C behaviour.
     if gain < 1e4
         nu[] += 1
         ssq[] += resid^2 / gain
         sumlog[] += gain > 0 ? log(gain) : NaN
     end
 
-    # 5) store standardized innovation: resid / sqrt(gain)
     if useResid
         rsResid[l] = gain > 0 ? resid / sqrt(gain) : NaN
     end
 
-    # 6) state update: a = anew + (M * resid)/gain
     @inbounds for i in 1:rd
         a[i] = anew[i] + M[i] * resid / gain
     end
 
-    # 7) covariance update: P = Pnew - (M Mᵀ)/gain
     @inbounds for i = 1:rd
         for j = 1:rd
             P[i, j] = Pnew[i, j] - (M[i] * M[j]) / gain
@@ -195,44 +180,9 @@ function kalman_update!(y_obs, anew, delta, Pnew, M, d, r, rd, a, P, useResid, r
     end
 end
 
-"""
-    compute_arima_likelihood(y::Vector{Float64},
-                             model::ArimaStateSpace,
-                             update_start::Int,
-                             give_resid::Bool)
-
-Compute the Gaussian log-likelihood and related quantities for a univariate ARIMA model using the Kalman filter.
-
-It runs a Kalman filter on the observed time series `y`, using the state-space representation stored in `model`.
-It accumulates the innovation sum of squares and the log-determinant contributions required for the Gaussian likelihood.
-If `give_resid` is true, the function also computes and returns the raw residuals (innovations).
-
-# Arguments
-- `y::Vector{Float64}`: Observed time series (univariate).
-- `model::ArimaStateSpace`: State-space model, as returned by `initialize_arima_state`.
-- `update_start::Int`: The time index at which to begin updating the likelihood and residuals (typically 1).
-- `give_resid::Bool`: If true, also compute and return residuals (raw innovations).
-
-# Returns
-A `Dict` with keys:
-- `"ssq"`: Sum of squared innovations.
-- `"sumlog"`: Accumulated log-determinants of the prediction error variances.
-- `"nu"`: Innovations (prediction errors).
-- `"resid"`: (only if `give_resid` is true) Raw residuals (innovations, i.e., prediction errors).
-
-# Notes
-- The arguments and behavior closely follow the C implementation in R's base ARIMA code.
-- For details on the state-space representation, see [`initialize_arima_state`](@ref).
-
-# References
-- Durbin, J. & Koopman, S. J. (2001). *Time Series Analysis by State Space Methods*. Oxford University Press.
-- Gardner, G., Harvey, A. C. & Phillips, G. D. A. (1980). Algorithm AS 154. *Applied Statistics*, 29, 311-322.
-
-"""
-# Tested and it is safe. Possible improvement potatial.
 function compute_arima_likelihood(
     y::Vector{Float64},
-    model::ArimaStateSpace,
+    model::Union{ArimaStateSpace,SARIMASystem},
     update_start::Int,
     give_resid::Bool;
     workspace::Union{KalmanWorkspace,Nothing}=nothing
@@ -241,7 +191,6 @@ function compute_arima_likelihood(
     phi = model.phi
     theta = model.theta
     delta = model.Delta
-    # Use references (not copies) for in-place modification of model state.
     a = model.a
     P = model.P
     Pnew = model.Pn
@@ -263,7 +212,6 @@ function compute_arima_likelihood(
         mm = d > 0 ? zeros(rd, rd) : nothing
         rsResid = give_resid ? zeros(n) : nothing
     else
-        # Reset workspace arrays for reuse
         reset!(workspace)
         anew = workspace.anew
         M = workspace.M
@@ -282,7 +230,7 @@ function compute_arima_likelihood(
         end
 
         if !isnan(y[l])
-            
+
             kalman_update!(y[l], anew, delta, Pnew, M, d, r, rd, a, P, give_resid, rsResid, l, ssq, sumlog, nu)
         else
             a .= anew
@@ -300,4 +248,55 @@ function compute_arima_likelihood(
     else
         return result_stats
     end
+end
+
+function kalman_forecast(n_ahead::Int, mod::Union{ArimaStateSpace,SARIMASystem}; update::Bool=false)
+    phi = mod.phi
+    theta = mod.theta
+    delta = mod.Delta
+    Z = mod.Z
+    a = copy(mod.a)
+    P = copy(mod.P)
+    Pnew = copy(mod.Pn)
+    h = mod.h
+
+    p = length(phi)
+    q = length(theta)
+    d = length(delta)
+    rd = length(a)
+    r = rd - d
+
+    forecasts = Vector{Float64}(undef, n_ahead)
+    variances = Vector{Float64}(undef, n_ahead)
+
+    anew = similar(a)
+    mm = d > 0 ? zeros(rd, rd) : nothing
+
+    for l in 1:n_ahead
+        state_prediction!(anew, a, p, r, d, rd, phi, delta)
+        a .= anew
+
+        fc = dot(Z, a)
+        forecasts[l] = fc
+
+        if d == 0
+            predict_covariance_nodiff!(Pnew, P, r, p, q, phi, theta)
+        else
+            predict_covariance_with_diff!(Pnew, P, r, d, p, q, rd, phi, delta, theta, mm)
+        end
+
+        tmpvar = h + dot(Z, Pnew, Z)
+        variances[l] = tmpvar
+
+        P .= Pnew
+    end
+
+    result = (pred = forecasts, var = variances)
+    if update
+        updated_mod = deepcopy(mod)
+        updated_mod.a .= a
+        updated_mod.P .= P
+        result = merge(result, (; mod = updated_mod))
+    end
+    return result
 end

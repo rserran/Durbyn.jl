@@ -322,41 +322,7 @@ function fit_custom_arima(
             println()
             println(arima_trace_str(order, seasonal, m, constant))
         end
-        return ArimaFit(
-            Array{Float64}(undef, 0),
-            Array{Float64}(undef, 0),
-            NamedMatrix(zeros(1, 1), ["z"]),
-            0.0,
-            zeros(0, 0),
-            Bool[],
-            0.0,
-            nothing,
-            nothing,
-            nothing,
-            Inf,
-            Int[],
-            Float64[],
-            false,
-            0,
-            0,
-            ArimaStateSpace(
-                Array{Float64}(undef, 0),
-                Array{Float64}(undef, 0),
-                Array{Float64}(undef, 0),
-                Array{Float64}(undef, 0),
-                Array{Float64}(undef, 0),
-                zeros(1, 1),
-                zeros(1, 1),
-                zeros(1, 1),
-                0.0,
-                zeros(1, 1),
-            ),
-            nothing,
-            "Error model",
-            nothing,
-            nothing,
-            nothing,
-        )
+        return _error_arimafit()
 
     end
 

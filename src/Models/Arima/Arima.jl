@@ -1,17 +1,15 @@
 module Arima
 export arima, ArimaFit, PDQ, predict_arima, ArimaPredictions
 export ArimaRJHFit, arima_rjh, auto_arima
-# Standard libs
+
 using LinearAlgebra
 import Statistics: mean
 import LinearAlgebra: rank
 
-# External packages
 using Polynomials
 using Distributions
 import Tables
 
-# Internal modules
 using ..Stats
 using ..Grammar
 import ..Utils: is_constant, _check_arg, dropmissing, NamedMatrix, align_columns, ismissingish
@@ -25,15 +23,20 @@ import ..Optimize: optimize, numerical_hessian
 import ..Grammar: ModelFormula, ArimaOrderTerm, VarTerm, compile_arima_formula
 
 import Base: show
-include("arima_types.jl")
+include("types.jl")
+include("covariance.jl")
+include("hyperparameters.jl")
+include("order.jl")
 include("kalman.jl")
-include("arima_covariance.jl")
-include("arima_base.jl")
+include("system.jl")
+include("compat.jl")
+include("fit.jl")
 include("arima_rjh.jl")
 include("auto_arima_utils.jl")
 include("auto_arima.jl")
-include("arima_formula_interface.jl")
+include("formula_interface.jl")
 include("simulate.jl")
 include("forecast.jl")
+include("show.jl")
 
 end

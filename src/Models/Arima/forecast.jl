@@ -1,3 +1,61 @@
+function predict_arima(model::ArimaFit, n_ahead::Int=1;
+    newxreg::Union{Nothing, NamedMatrix}= nothing, se_fit::Bool=true)
+
+    myncol(x) = isnothing(x) ? 0 : size(x, 2)
+
+    if !isnothing(newxreg) && isnothing(model.xreg)
+        throw(ArgumentError("newxreg provided but model was fit without exogenous regressors"))
+    end
+
+    if newxreg isa NamedMatrix
+        newxreg = align_columns(newxreg, model.xreg.colnames)
+        newxreg = newxreg.data
+    end
+
+    arma = model.arma
+    coefs = vec(model.coef.data)
+    coef_names = model.coef.colnames
+    narma = sum(arma[1:4])
+    ncoefs = length(coefs)
+
+    intercept_idx = findfirst(==("intercept"), coef_names)
+    has_intercept = !isnothing(intercept_idx)
+
+    ncxreg = model.xreg isa NamedMatrix ? size(model.xreg.data, 2) : 0
+    if myncol(newxreg) != ncxreg
+        throw(ArgumentError("`xreg` and `newxreg` have different numbers of columns"))
+    end
+    xm = zeros(n_ahead)
+    if ncoefs > narma
+        if has_intercept && coef_names[narma+1] == "intercept"
+            intercept_col = ones(n_ahead, 1)
+            usexreg = isnothing(newxreg) ? intercept_col : hcat(intercept_col, newxreg)
+            reg_coef_inds = (narma+1):ncoefs
+        else
+            usexreg = newxreg
+            reg_coef_inds = (narma+1):ncoefs
+        end
+        if narma == 0
+            xm = vec(usexreg * coefs)
+        else
+            xm = vec(usexreg * coefs[reg_coef_inds])
+        end
+    end
+
+    pred, se = kalman_forecast(n_ahead, model.model, update=false)
+
+    pred = pred .+ xm
+    if se_fit
+        se = sqrt.(se .* model.sigma2)
+    else
+        se = fill(NaN, length(pred))
+    end
+
+    return ArimaPredictions(pred, se, model.y, model.fitted, model.residuals, model.method)
+
+end
+
+
 """
     forecast(model::ArimaFit;
              h::Int,
