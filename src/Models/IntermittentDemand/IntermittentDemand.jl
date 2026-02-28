@@ -3,7 +3,7 @@ using Statistics
 import Base: show
 import Statistics: mean
 
-using ..Optimize
+using Optim
 using ..Generics
 import ..Utils: evaluation_metrics
 import ..Utils: _check_arg

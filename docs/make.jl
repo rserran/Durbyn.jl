@@ -39,7 +39,6 @@ makedocs(
             "ARAR"                   => "arar.md",
             "ARARMA"                 => "ararma.md",
             "Statistics"             => "stats.md",
-            "Optimization"           => "optimize.md",
             "Utilities"              => "utils.md",
             "Table Operations"       => "tableops.md",
         ],

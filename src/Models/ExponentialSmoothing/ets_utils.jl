@@ -185,7 +185,7 @@ function optim_ets_base(
     max_state_len = nstate + (seasontype_code != 0 ? 1 : 0)
     workspace = ETSWorkspace(length(y), m, nmse, max_state_len)
 
-    result = nelder_mead(par -> objective_fun(
+    result = Optim.optimize(par -> objective_fun(
             par,
             y,
             nstate,
@@ -209,11 +209,12 @@ function optim_ets_base(
             opt_phi,
             workspace,
         ), opt_params,
+        NelderMead(),
         options)
 
-    optimized_params = result.x_opt
-    optimized_value = result.f_opt
-    number_of_iterations = result.fncount
+    optimized_params = Optim.minimizer(result)
+    optimized_value = Optim.minimum(result)
+    number_of_iterations = Optim.f_calls(result)
 
     optimized_params =
         create_params(optimized_params, opt_alpha, opt_beta, opt_gamma, opt_phi)
@@ -241,7 +242,7 @@ function etsmodel(
     opt_crit::Symbol,
     nmse::Int,
     bounds::Symbol,
-    options::NelderMeadOptions)
+    options::Optim.Options)
 
     if seasontype == "N"
         m = 1
@@ -1040,7 +1041,7 @@ function ets_base_model(
     allow_multiplicative_trend::Bool = false,
     use_initial_values::Bool = false,
     missing_method::MissingMethod = Contiguous(),
-    options::NelderMeadOptions,
+    options::Optim.Options,
 )
 
     orig_y,

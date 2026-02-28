@@ -30,7 +30,7 @@ using Distributions: Normal, quantile as dist_quantile
 using Tables
 
 import ..Utils: is_constant
-import ..Optimize: optimize
+using Optim
 import ..Stats: acf, decompose
 import ..Generics: forecast, Forecast
 import ..Grammar: theta 
@@ -360,12 +360,9 @@ function optimize_theta_parameters(y::AbstractVector{T}, model_type::ThetaModelT
     end
 
     # Use L-BFGS-B for bounded optimization
-    result = optimize(x0, objective;
-                      method=:lbfgsb,
-                      lower=lower, upper=upper,
-                      control=Dict("maxit" => 1000))
+    result = Optim.optimize(objective, lower, upper, x0, Fminbox(LBFGS()), Optim.Options(iterations=1000))
 
-    opt_params = result.par
+    opt_params = Optim.minimizer(result)
     j = 1
 
     opt_level = init_params.optimize_level ? opt_params[j] : init_params.initial_level

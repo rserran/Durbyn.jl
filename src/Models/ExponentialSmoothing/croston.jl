@@ -65,7 +65,7 @@ end
 
 
 """
-    croston(y, m; alpha=nothing, options=NelderMeadOptions())
+    croston(y, m; alpha=nothing, options=Optim.Options(iterations=500))
 
 Fit a Croston model for intermittent demand forecasting.
 
@@ -78,7 +78,7 @@ the forecast is computed as the ratio of smoothed demand size to smoothed interv
 - `m::Int`: Seasonal period (typically 1 for non-seasonal intermittent demand)
 - `alpha::Union{Float64,Bool,Nothing}=nothing`: Smoothing parameter. If `nothing`, parameter is
   optimized automatically
-- `options::NelderMeadOptions=NelderMeadOptions()`: Optimization settings for parameter estimation
+- `options::Optim.Options=Optim.Options(iterations=500)`: Optimization settings for parameter estimation
 
 # Returns
 - `CrostonFit`: Fitted Croston model object
@@ -113,7 +113,7 @@ function croston(
     y::AbstractArray,
     m::Int;
     alpha::Union{Float64,Bool,Nothing} = nothing,
-    options::NelderMeadOptions = NelderMeadOptions(),
+    options::Optim.Options = Optim.Options(iterations=500),
 )
 
     x = copy(y)
@@ -214,14 +214,14 @@ function forecast(object::CrostonFit, h::Int)
 end
 
 """
-    croston(y; alpha=nothing, options=NelderMeadOptions())
+    croston(y; alpha=nothing, options=Optim.Options(iterations=500))
 
 Fit a Croston model with default seasonal period m=1 (non-seasonal).
 
 # Arguments
 - `y::AbstractArray`: Demand time series (may contain zeros)
 - `alpha::Union{Float64,Bool,Nothing}=nothing`: Smoothing parameter
-- `options::NelderMeadOptions=NelderMeadOptions()`: Optimization settings
+- `options::Optim.Options=Optim.Options(iterations=500)`: Optimization settings
 
 # Returns
 - `CrostonFit`: Fitted Croston model object
@@ -239,7 +239,7 @@ fc = forecast(fit, 12)
 function croston(
     y::AbstractArray;
     alpha::Union{Float64,Bool,Nothing} = nothing,
-    options::NelderMeadOptions = NelderMeadOptions(),
+    options::Optim.Options = Optim.Options(iterations=500),
 )
 return croston(y, 1, alpha = alpha, options = options)
 end

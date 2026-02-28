@@ -149,7 +149,7 @@ function is_arma_usable(phi::Vector{Float64}, theta::Vector{Float64})
     return ar_ok && ma_ok
 end
 
-function fit_arma(p::Int, q::Int, y::Vector{Float64}, options::NelderMeadOptions=NelderMeadOptions())
+function fit_arma(p::Int, q::Int, y::Vector{Float64}, options::Optim.Options=Optim.Options(iterations=500))
     n = length(y)
 
     # Validate inputs
@@ -203,10 +203,8 @@ function fit_arma(p::Int, q::Int, y::Vector{Float64}, options::NelderMeadOptions
 
     parscale = max.(abs.(init), 0.1)
 
-    est_params = descaler(
-        nelder_mead(θ -> arma_loss(descaler(θ, parscale)), scaler(init, parscale), options).x_opt,
-        parscale
-    )
+    result = Optim.optimize(θ -> arma_loss(θ .* parscale), init ./ parscale, NelderMead(), options)
+    est_params = Optim.minimizer(result) .* parscale
 
     return (est_params[1:p], est_params[p+1:p+q], exp(est_params[end]))
 end
@@ -221,7 +219,7 @@ end
            max_ar_depth::Int=26,
            max_lag::Int=40,
            p::Int=4, q::Int=1,
-           options::NelderMeadOptions=NelderMeadOptions()) -> ArarmaModel
+           options::Optim.Options=Optim.Options(iterations=500)) -> ArarmaModel
 
 Fit an **ARARMA** model to a univariate numeric series `y`.
 
@@ -290,7 +288,7 @@ Parzen, E. (1982). ARARMA Models for Time Series Analysis and Forecasting.
 Journal of Forecasting, 1(1), 67-82.
 """
 function ararma(y::Vector{<:Real}; max_ar_depth::Int=26, max_lag::Int=40, p::Int=4, q::Int=1,
-    options::NelderMeadOptions=NelderMeadOptions())
+    options::Optim.Options=Optim.Options(iterations=500))
 
     # Validate ARMA orders
     p < 0 && throw(ArgumentError("AR order p must be non-negative. Got p=$p"))
@@ -595,7 +593,7 @@ end
                 crit::Symbol=:aic,            # or :bic
                 max_ar_depth::Int=26,
                 max_lag::Int=40,
-                options::NelderMeadOptions=NelderMeadOptions()) -> Union{ArarmaModel,Nothing}
+                options::Optim.Options=Optim.Options(iterations=500)) -> Union{ArarmaModel,Nothing}
 
 Automatic order selection wrapper around [`ararma`](@ref).
 
@@ -627,7 +625,7 @@ Parzen, E. (1982). *ARARMA Models for Time Series Analysis and Forecasting*. Jou
 """
 function auto_ararma(y::Vector{<:Real}; min_p::Int=0, max_p::Int=4, min_q::Int=0, max_q::Int=2,
     crit::Symbol=:aic, max_ar_depth::Int=26, max_lag::Int=40,
-    options::NelderMeadOptions=NelderMeadOptions())
+    options::Optim.Options=Optim.Options(iterations=500))
 
     # Validate bounds
     min_p < 0 && throw(ArgumentError("min_p must be non-negative. Got min_p=$min_p"))

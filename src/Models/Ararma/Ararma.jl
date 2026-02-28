@@ -6,7 +6,7 @@ using Polynomials
 import Base: show
 import ..Generics: Forecast
 import ..Generics: forecast, fitted, residuals
-import ..Optimize: NelderMeadOptions, nelder_mead, scaler, descaler
+using Optim
 import ..Grammar: arar
 using ..Grammar: ModelFormula, ArarTerm, ArimaOrderTerm, _extract_single_term
 using Tables

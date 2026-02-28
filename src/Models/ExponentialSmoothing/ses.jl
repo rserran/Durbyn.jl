@@ -61,8 +61,8 @@ struct SES
 end
 
 """
-    ses(y; initial=:optimal, alpha=nothing, lambda=nothing, biasadj=false, options=NelderMeadOptions())
-    ses(y, m; initial=:optimal, alpha=nothing, lambda=nothing, biasadj=false, options=NelderMeadOptions())
+    ses(y; initial=:optimal, alpha=nothing, lambda=nothing, biasadj=false, options=Optim.Options(iterations=500))
+    ses(y, m; initial=:optimal, alpha=nothing, lambda=nothing, biasadj=false, options=Optim.Options(iterations=500))
 
 Fit a Simple Exponential Smoothing (SES) model to a time series.
 
@@ -86,7 +86,7 @@ smoothing parameter α to exponentially weight past observations.
   - `:auto` or `true`: Automatically select optimal λ.
   - `Float64`: Use specified λ value.
 - `biasadj::Bool=false`: Apply bias adjustment for Box-Cox back-transformation.
-- `options::NelderMeadOptions`: Optimization options for parameter estimation.
+- `options::Optim.Options`: Optimization options for parameter estimation.
 
 # Returns
 - `SES`: Fitted SES model object containing fitted values, residuals, parameters,
@@ -137,7 +137,7 @@ function ses(
     alpha::Union{Float64,Bool,Nothing} = nothing,
     lambda::Union{Float64,Bool,Nothing} = nothing,
     biasadj::Bool = false,
-    options::NelderMeadOptions = NelderMeadOptions(),)
+    options::Optim.Options = Optim.Options(iterations=500),)
 
     ses(y, 1, initial = initial, alpha = alpha, lambda = lambda, biasadj = biasadj, options = options)
 end
@@ -149,7 +149,7 @@ function ses(
     alpha::Union{Float64,Bool,Nothing} = nothing,
     lambda::Union{Float64,Bool,Nothing} = nothing,
     biasadj::Bool = false,
-    options::NelderMeadOptions = NelderMeadOptions(),
+    options::Optim.Options = Optim.Options(iterations=500),
 )
 
     initial = _check_arg(initial, (:optimal, :simple), "initial")

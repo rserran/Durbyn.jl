@@ -21,7 +21,7 @@
         allow_multiplicative_trend::Bool = false,
         use_initial_values::Bool = false,
         missing_method::MissingMethod = Contiguous(),
-        options::NelderMeadOptions = NelderMeadOptions()
+        options::Optim.Options = Optim.Options(iterations=500)
     ) -> EtsModel
 
 Exponential smoothing state space model (ETS).
@@ -77,7 +77,7 @@ information criterion given by `ic`.
   initial states (no re-estimation of initials). If `false`, initials are re-estimated.
 - `missing_method::MissingMethod=Contiguous()`: Strategy for handling missing values in `y`.
   Use `Contiguous()` (largest contiguous block), `Interpolate()` (interpolate), or `FailMissing()` (error).
-- `options::NelderMeadOptions=NelderMeadOptions()`: Optimizer configuration for parameter estimation.
+- `options::Optim.Options=Optim.Options(iterations=500)`: Optimizer configuration for parameter estimation.
 
 # Details
 The ETS family encompasses exponential smoothing methods within a state space
@@ -145,7 +145,7 @@ function ets(
     allow_multiplicative_trend::Bool = false,
     use_initial_values::Bool = false,
     missing_method::MissingMethod = Contiguous(),
-    options::NelderMeadOptions = NelderMeadOptions(maxit=2000)
+    options::Optim.Options = Optim.Options(iterations=2000)
 )
 
     if model == "ZZZ" && is_constant(y)

@@ -88,7 +88,7 @@ Fits a Croston model to intermittent demand data.
 - `y::AbstractArray`: Demand time series (may contain zeros)
 - `m::Int`: Seasonal period (default: 1)
 - `alpha::Union{Float64,Bool,Nothing}`: Smoothing parameter (nothing for automatic optimization)
-- `options::NelderMeadOptions`: Optimization settings for parameter estimation
+- `options::Optim.Options`: Optimization settings for parameter estimation
 
 **Returns:**
 - `CrostonFit`: Fitted model object

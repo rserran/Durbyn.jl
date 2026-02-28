@@ -87,14 +87,13 @@ function croston_opt(x, method, cost, w, nop, init, init_opt)
         if nop != 1
             cost_fn = p -> croston_cost(p, x, cost, method, w,
                 nop, true, init, init_opt, lbound, ubound)
-            options = NelderMeadOptions(maxit=2000)
-            result = nelder_mead(cost_fn, p0, options)
-            wopt = result.x_opt
+            result = Optim.optimize(cost_fn, Float64.(p0), NelderMead(), Optim.Options(iterations=2000))
+            wopt = Optim.minimizer(result)
         else
             cost_fn = p -> croston_cost([p], x, cost, method, w,
                 nop, true, init, init_opt, lbound, ubound)
-            result = brent(cost_fn, lbound[1], ubound[1])
-            wopt = [result.x_opt]
+            result = Optim.optimize(cost_fn, Float64(lbound[1]), Float64(ubound[1]), Brent())
+            wopt = [Optim.minimizer(result)]
         end
 
         wopt = [wopt..., init...]
@@ -106,9 +105,8 @@ function croston_opt(x, method, cost, w, nop, init, init_opt)
 
         cost_fn = p -> croston_cost(p, x, cost, method, w,
             nop, true, init, true, lbound, ubound)
-        options = NelderMeadOptions(maxit=2000)
-        result = nelder_mead(cost_fn, p0, options)
-        wopt = result.x_opt
+        result = Optim.optimize(cost_fn, Float64.(p0), NelderMead(), Optim.Options(iterations=2000))
+        wopt = Optim.minimizer(result)
 
     elseif !isnothing(w) && init_opt
         nop = length(w)
@@ -118,9 +116,8 @@ function croston_opt(x, method, cost, w, nop, init, init_opt)
 
         cost_fn = p -> croston_cost(p, x, cost, method, w,
             nop, false, init, true, lbound, ubound)
-        options = NelderMeadOptions(maxit=2000)
-        result = nelder_mead(cost_fn, p0, options)
-        wopt = result.x_opt
+        result = Optim.optimize(cost_fn, Float64.(p0), NelderMead(), Optim.Options(iterations=2000))
+        wopt = Optim.minimizer(result)
 
         wopt = [w..., wopt...]
 

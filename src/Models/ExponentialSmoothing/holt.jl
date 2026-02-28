@@ -64,10 +64,10 @@ end
 """
     holt(y; damped=false, initial=:optimal, exponential=false, alpha=nothing,
          beta=nothing, phi=nothing, lambda=nothing, biasadj=false,
-         options=NelderMeadOptions())
+         options=Optim.Options(iterations=500))
     holt(y, m; damped=false, initial=:optimal, exponential=false, alpha=nothing,
          beta=nothing, phi=nothing, lambda=nothing, biasadj=false,
-         options=NelderMeadOptions())
+         options=Optim.Options(iterations=500))
 
 Fit Holt's linear trend method to a time series.
 
@@ -102,7 +102,7 @@ seasonality using two smoothing equations: one for the level and one for the tre
   - `:auto` or `true`: Automatically select optimal λ.
   - `Float64`: Use specified λ value.
 - `biasadj::Bool=false`: Apply bias adjustment for Box-Cox back-transformation.
-- `options::NelderMeadOptions`: Optimization options for parameter estimation.
+- `options::Optim.Options`: Optimization options for parameter estimation.
 
 # Returns
 - `Holt`: Fitted Holt model object containing fitted values, residuals, parameters,
@@ -210,7 +210,7 @@ function holt(
     phi::Union{Float64,Bool,Nothing} = nothing,
     lambda::Union{Float64,Bool,Nothing} = nothing,
     biasadj::Bool = false,
-    options::NelderMeadOptions = NelderMeadOptions(),
+    options::Optim.Options = Optim.Options(iterations=500),
 )
     holt(y, 1, damped=damped, initial=initial, exponential=exponential,
          alpha=alpha, beta=beta, phi=phi, lambda=lambda, biasadj=biasadj,
@@ -228,7 +228,7 @@ function holt(
     phi::Union{Float64,Bool,Nothing} = nothing,
     lambda::Union{Float64,Bool,Nothing} = nothing,
     biasadj::Bool = false,
-    options::NelderMeadOptions = NelderMeadOptions(),
+    options::Optim.Options = Optim.Options(iterations=500),
 
 )
 

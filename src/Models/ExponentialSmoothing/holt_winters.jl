@@ -65,7 +65,7 @@ end
     holt_winters(y, m; seasonal=:additive, damped=false, initial=:optimal,
                  exponential=false, alpha=nothing, beta=nothing, gamma=nothing,
                  phi=nothing, lambda=nothing, biasadj=false,
-                 options=NelderMeadOptions())
+                 options=Optim.Options(iterations=500))
 
 Fit Holt-Winters' seasonal method to a time series.
 
@@ -102,7 +102,7 @@ for the level, one for the trend, and one for the seasonal component.
   - `:auto` or `true`: Automatically select optimal λ.
   - `Float64`: Use specified λ value.
 - `biasadj::Bool=false`: Apply bias adjustment for Box-Cox back-transformation.
-- `options::NelderMeadOptions`: Optimization options for parameter estimation.
+- `options::Optim.Options`: Optimization options for parameter estimation.
 
 # Returns
 - `HoltWinters`: Fitted Holt-Winters model object containing fitted values, residuals,
@@ -227,7 +227,7 @@ function holt_winters(
     phi::Union{Float64,Bool,Nothing} = nothing,
     lambda::Union{Float64,Bool,Nothing} = nothing,
     biasadj::Bool = false,
-    options::NelderMeadOptions = NelderMeadOptions(),
+    options::Optim.Options = Optim.Options(iterations=500),
 )
 
     initial = _check_arg(initial, (:optimal, :simple), "initial")

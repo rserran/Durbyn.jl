@@ -207,7 +207,7 @@ function holt_winters_conventional(
     lambda::Union{Nothing,Float64} = nothing,
     biasadj::Bool = false,
     warnings::Bool = true,
-    options::NelderMeadOptions
+    options::Optim.Options
 )
     if !(seasonal in (:additive, :multiplicative))
         throw(
@@ -349,7 +349,7 @@ function holt_winters_conventional(
         
         cal_opt_sse_closure =
             p -> calculate_opt_sse(
-                descaler(p, parscale),
+                p .* parscale,
                 select,
                 x,
                 lenx,
@@ -365,16 +365,14 @@ function holt_winters_conventional(
                 s_start,
             )
 
-        sol = nelder_mead(cal_opt_sse_closure, scaler(starting_points, parscale), options)
+        sol = Optim.optimize(cal_opt_sse_closure, starting_points ./ parscale, NelderMead(), options)
 
-        is_convergence = sol.fail == 0
-        minimizers = descaler(sol.x_opt, parscale)
+        is_convergence = Optim.converged(sol)
+        minimizers = Optim.minimizer(sol) .* parscale
 
         if (!is_convergence || any((minimizers .< 0) .| (minimizers .> 1))) && warnings
-            if sol.fail in [1, 10]
-                @warn "Optimization difficulties: convergence code $(sol.fail)"
-            elseif sol.fail ∉ [0, 1, 10]
-                @warn "Optimization failure: convergence code $(sol.fail), using best parameters found"
+            if !is_convergence
+                @warn "Optimization difficulties: did not converge"
             end
         end
 

@@ -28,8 +28,8 @@ function _guerrero_lambda(x::AbstractVector{<:Number}, m::Int, lower::Real=-1.0,
         println("Warning: Guerrero's method for selecting a Box-Cox parameter (lambda) is given for strictly positive data.")
     end
 
-    result = Optimize.brent(lam -> _guerrero_cv(lam, x_float, m, nonseasonal_length=nonseasonal_length), Float64(lower), Float64(upper))
-    return result.x_opt
+    result = Optim.optimize(lam -> _guerrero_cv(lam, x_float, m, nonseasonal_length=nonseasonal_length), Float64(lower), Float64(upper), Brent())
+    return Optim.minimizer(result)
 end
 
 function _qr_residuals(X, y)

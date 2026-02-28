@@ -262,7 +262,7 @@ ararma(y::Vector{<:Real};
        max_lag::Int=40,
        p::Int=4,
        q::Int=1,
-       options::NelderMeadOptions=NelderMeadOptions()) -> ArarmaModel
+       options::Optim.Options=Optim.Options(iterations=500)) -> ArarmaModel
 ```
 
 **Arguments:**
@@ -271,7 +271,7 @@ ararma(y::Vector{<:Real};
 - `max_lag`: Maximum lag for autocovariance computation (default: 40)
 - `p`: AR order for ARMA stage (default: 4)
 - `q`: MA order for ARMA stage (default: 1)
-- `options`: Nelder-Mead optimization options
+- `options`: Optimization options (from Optim.jl)
 
 **Returns:** An `ArarmaModel` struct containing fitted model components
 
@@ -282,7 +282,7 @@ auto_ararma(y::Vector{<:Real};
             crit::Symbol=:aic,
             max_ar_depth::Int=26,
             max_lag::Int=40,
-            options::NelderMeadOptions=NelderMeadOptions()) -> ArarmaModel
+            options::Optim.Options=Optim.Options(iterations=500)) -> ArarmaModel
 ```
 
 **Arguments:**

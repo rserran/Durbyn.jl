@@ -4,7 +4,7 @@ import Statistics: mean, std, quantile, minimum, maximum, var, median
 import LinearAlgebra: diag, dot, qr
 import Distributions: Normal, quantile as dist_quantile
 
-using ..Optimize
+using Optim
 import ..Utils: dropmissing, as_integer, mean2, is_constant, _check_arg, NamedMatrix, ismissingish, duplicated, completecases, nearest_odd
 import ..Generics: plot, summary, fitted, residuals, predict, coef, coefficients, coefs
 

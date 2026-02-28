@@ -64,7 +64,7 @@ then fits a short-memory ARMA(p,q) model.
 **For `ararma` mode (when orders fixed):**
 - `p::Int` - AR order (overridden by formula)
 - `q::Int` - MA order (overridden by formula)
-- `options::NelderMeadOptions` - Optimizer options
+- `options::Optim.Options` - Optimizer options
 
 # Returns
 `ArarmaModel` object containing the fitted model

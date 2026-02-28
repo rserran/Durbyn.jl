@@ -26,7 +26,7 @@ then fits a short-memory ARMA(p,q) model on the prefiltered residuals.
 
 **Additional kwargs:**
 - For `auto_ararma` mode: `max_p`, `max_q`, `crit` (`:aic` or `:bic`)
-- For `ararma` mode: `options` (NelderMeadOptions)
+- For `ararma` mode: `options` (Optim.Options)
 
 # ARMA Order Specification
 

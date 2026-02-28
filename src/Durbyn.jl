@@ -2,7 +2,6 @@ module Durbyn
 
 include("Utils/Utils.jl")
 
-include("Optimize/Optimize.jl")
 include("Generics/Generics.jl")
 include("Stats/Stats.jl")
 include("Grammar/Grammar.jl")
@@ -24,7 +23,6 @@ include("TableOps/TableOps.jl")
 using .Utils
 using .Generics
 using .ExponentialSmoothing
-using .Optimize
 using .Stats
 using .Grammar
 using .ModelSpecs
@@ -41,7 +39,6 @@ using .Diffusion
 import .Utils: air_passengers, NamedMatrix, get_elements, get_vector, align_columns, add_drift_term, cbind
 import .Utils: Formula, parse_formula, compile, model_matrix, model_frame
 import .Generics: plot, fitted, residuals, summary, predict, forecast, fit, accuracy, list_series, head, tail
-import .Optimize: NelderMeadOptions
 import .Grammar: p, q, d, P, Q, D, auto, ModelFormula, @formula, VarTerm, AutoVarTerm, ArarTerm, ThetaTerm, DiffusionTerm
 import .Grammar: e, t, s, drift, ses, holt, hw, holt_winters, croston, arar
 import .Grammar: naive_term, snaive_term, rw_term, meanf_term, NaiveTerm, SnaiveTerm, RwTerm, MeanfTerm
@@ -103,9 +100,6 @@ export pivot_longer, pivot_wider, glimpse
 # Utilities
 public NamedMatrix, get_elements, get_vector, align_columns, add_drift_term, cbind
 public Formula, parse_formula, compile, model_matrix, model_frame
-
-# Optimizer config
-public NelderMeadOptions
 
 # Grammar AST types
 public ModelFormula, VarTerm, AutoVarTerm, ArarTerm, ThetaTerm, DiffusionTerm

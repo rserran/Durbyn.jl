@@ -354,18 +354,23 @@ function fit_diffusion(y::AbstractVector{<:Real};
                              fixed_params, loss, cumulative, mscal_factor)
     end
 
+    function _optim_algo(m::Symbol)
+        m === :lbfgsb ? Fminbox(LBFGS()) :
+        m === :bfgs   ? BFGS() :
+                        NelderMead()
+    end
+
     function _run_optim(x0_start)
-        res = optimize(x0_start, objective;
-                       method=method,
-                       lower=lower,
-                       upper=upper,
-                       control=Dict("maxit" => maxiter))
+        algo = _optim_algo(method)
+        res = if method === :lbfgsb
+            Optim.optimize(objective, lower, upper, x0_start, algo, Optim.Options(iterations=maxiter))
+        else
+            Optim.optimize(objective, x0_start, algo, Optim.Options(iterations=maxiter))
+        end
 
         if method !== :nelder_mead
-            res_nm = optimize(x0_start, objective;
-                              method=:nelder_mead,
-                              control=Dict("maxit" => maxiter))
-            if res_nm.value < res.value
+            res_nm = Optim.optimize(objective, x0_start, NelderMead(), Optim.Options(iterations=maxiter))
+            if Optim.minimum(res_nm) < Optim.minimum(res)
                 res = res_nm
             end
         end
@@ -381,7 +386,7 @@ function fit_diffusion(y::AbstractVector{<:Real};
                 x0_alt = copy(x0)
                 x0_alt[idx] = max(x0[idx] * scale, lower[idx])
                 alt_result = _run_optim(x0_alt)
-                if alt_result.value < result.value
+                if Optim.minimum(alt_result) < Optim.minimum(result)
                     result = alt_result
                 end
             end
@@ -393,7 +398,7 @@ function fit_diffusion(y::AbstractVector{<:Real};
                     x0_alt = copy(x0)
                     x0_alt[idx] = max(probe, lower[idx])
                     alt_result = _run_optim(x0_alt)
-                    if alt_result.value < result.value
+                    if Optim.minimum(alt_result) < Optim.minimum(result)
                         result = alt_result
                     end
                 end
@@ -401,7 +406,7 @@ function fit_diffusion(y::AbstractVector{<:Real};
         end
     end
 
-    opt_params = result.par
+    opt_params = Optim.minimizer(result)
     final_params = _reconstruct_params(opt_params, model_type, fixed_params, mscal_factor)
 
     curve = get_curve(model_type, n_clean, final_params)

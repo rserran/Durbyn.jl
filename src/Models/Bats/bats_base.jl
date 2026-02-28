@@ -1489,14 +1489,9 @@ function fit_specific_bats(
         objective_scaled = θs -> original_objective(θs .* par_scale)
 
         maxit = 100 * length(param_vector)^2
-        opt_result = optimize(
-            scaled_param0,
-            objective_scaled;
-            method = :nelder_mead,
-            control = Dict("maxit" => maxit),
-        )
+        opt_result = Optim.optimize(objective_scaled, scaled_param0, NelderMead(), Optim.Options(iterations=maxit))
 
-        opt_par_scaled = opt_result.par
+        opt_par_scaled = Optim.minimizer(opt_result)
         opt_par = opt_par_scaled .* par_scale
 
 
@@ -1557,22 +1552,12 @@ function fit_specific_bats(
 
         if length(param_vector) > 1
             maxit = 100 * length(param_vector)^2
-            opt_result = optimize(
-                scaled_param0,
-                objective_scaled;
-                method = :nelder_mead,
-                control = Dict("maxit" => maxit),
-            )
+            opt_result = Optim.optimize(objective_scaled, scaled_param0, NelderMead(), Optim.Options(iterations=maxit))
         else
-
-            opt_result = optimize(
-                scaled_param0,
-                objective_scaled;
-                method = :bfgs,
-            )
+            opt_result = Optim.optimize(objective_scaled, scaled_param0, BFGS())
         end
 
-        opt_par_scaled = opt_result.par
+        opt_par_scaled = Optim.minimizer(opt_result)
         opt_par = opt_par_scaled .* par_scale
 
         paramz = unparameterise(opt_par, control)
@@ -1605,7 +1590,7 @@ function fit_specific_bats(
     end
 
 
-    likelihood = opt_result.value
+    likelihood = Optim.minimum(opt_result)
 
     aic = likelihood + 2 * (length(param_vector) + size(x_nought, 1))
 
@@ -1619,7 +1604,7 @@ function fit_specific_bats(
         ar_coefficients = ar_coefs,
         ma_coefficients = ma_coefs,
         likelihood = likelihood,
-        optim_return_code = opt_result.convergence,
+        optim_return_code = Optim.converged(opt_result) ? 0 : 1,
         variance = variance,
         aic = aic,
         parameters = (vect = opt_par, control = control),

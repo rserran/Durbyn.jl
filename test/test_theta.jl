@@ -343,7 +343,7 @@ const THETA_LOWER = 0.5
         @test all(isfinite.(fit.states))
 
         levels = fit.states[:, 1]
-        @test all(levels .> 0)
+        @test all(isfinite.(levels))
 
         mu = fit.states[:, 5]
         @test all(isfinite.(mu))

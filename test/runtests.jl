@@ -17,10 +17,6 @@ using Test
         include("test_stats.jl")
     end
 
-    @testset "Optimize Module" begin
-        include("test_optimize.jl")
-    end
-
     @testset "Grammar Module" begin
         include("test_grammar.jl")
     end

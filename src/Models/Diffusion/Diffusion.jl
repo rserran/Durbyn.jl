@@ -49,7 +49,7 @@ module Diffusion
 using Statistics
 using LinearAlgebra
 
-import ..Optimize: optimize
+using Optim
 import ..Generics: forecast, Forecast, predict
 
 export diffusion, fit_diffusion, DiffusionFit

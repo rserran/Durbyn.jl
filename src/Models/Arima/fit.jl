@@ -1,3 +1,36 @@
+function _optim_algo(method::Symbol)
+    method === :bfgs       ? BFGS() :
+    method === :lbfgsb     ? LBFGS() :
+    method === :nelder_mead ? NelderMead() :
+    throw(ArgumentError("Unknown optim method: $method"))
+end
+
+"""
+    _arima_optimize(x0, fn, optim_method, ctrl)
+
+Wrapper that maps the old Optimize.optimize API to Optim.jl.
+Handles parscale (via variable transform), ndeps, and maxit.
+Returns a NamedTuple (convergence, par, value).
+"""
+function _arima_optimize(x0, fn, optim_method::Symbol, ctrl::Dict)
+    parscale = get(ctrl, "parscale", ones(length(x0)))
+    maxit    = get(ctrl, "maxit", 100)
+
+    # Scale: work in scaled space where x_scaled = x ./ parscale
+    scaled_fn = p -> fn(p .* parscale)
+    x0_scaled = x0 ./ parscale
+
+    algo = _optim_algo(optim_method)
+    opts = Optim.Options(iterations=maxit)
+
+    result = Optim.optimize(scaled_fn, x0_scaled, algo, opts)
+    par = Optim.minimizer(result) .* parscale
+
+    return (convergence = Optim.converged(result) ? 0 : 1,
+            par = par,
+            value = Optim.minimum(result))
+end
+
 function compute_css_residuals(
     y::AbstractArray,
     arma::Vector{Int},
@@ -357,7 +390,7 @@ function fit!(model::SARIMA{Fl}) where {Fl}
                 ctrl["maxit"] = 500
             end
 
-            opt = optimize(init[mask], p -> _armaCSS(p); method=optim_method, control=ctrl)
+            opt = _arima_optimize(init[mask], p -> _armaCSS(p), optim_method, ctrl)
             res = (converged=opt.convergence == 0, minimizer=opt.par, minimum=opt.value)
         end
 
@@ -379,7 +412,7 @@ function fit!(model::SARIMA{Fl}) where {Fl}
         if no_optim
             var = zeros(0)
         else
-            hessian = numerical_hessian(p -> _armaCSS(p), res.minimizer)
+            hessian = finite_difference_hessian(p -> _armaCSS(p), res.minimizer)
             var = inv(hessian * n_used)
         end
 
@@ -403,7 +436,7 @@ function fit!(model::SARIMA{Fl}) where {Fl}
                     ctrl["maxit"] = 500
                 end
 
-                opt = optimize(init[mask], p -> _armaCSS(p); method=optim_method, control=ctrl)
+                opt = _arima_optimize(init[mask], p -> _armaCSS(p), optim_method, ctrl)
                 res = (converged=opt.convergence == 0, minimizer=opt.par, minimum=opt.value)
             end
 
@@ -445,7 +478,7 @@ function fit!(model::SARIMA{Fl}) where {Fl}
         else
             ctrl = copy(optim_control)
             ctrl["parscale"] = parscale[mask]
-            opt = optimize(init[mask], p -> _armafn(p, transform_pars); method=optim_method, control=ctrl)
+            opt = _arima_optimize(init[mask], p -> _armafn(p, transform_pars), optim_method, ctrl)
             res = (converged=opt.convergence == 0, minimizer=opt.par, minimum=opt.value)
         end
 
@@ -473,12 +506,12 @@ function fit!(model::SARIMA{Fl}) where {Fl}
                 ctrl = copy(optim_control)
                 ctrl["parscale"] = parscale[mask]
                 ctrl["maxit"] = 0
-                opt = optimize(coef[mask], p -> _armafn(p, true); method=optim_method, control=ctrl)
+                opt = _arima_optimize(coef[mask], p -> _armafn(p, true), optim_method, ctrl)
                 res = (converged=opt.convergence == 0, minimizer=opt.par, minimum=opt.value)
-                hessian = numerical_hessian(p -> _armafn(p, true), res.minimizer)
+                hessian = finite_difference_hessian(p -> _armafn(p, true), res.minimizer)
                 coef[mask] .= res.minimizer
             else
-                hessian = numerical_hessian(p -> _armafn(p, true), res.minimizer)
+                hessian = finite_difference_hessian(p -> _armafn(p, true), res.minimizer)
             end
 
             A = compute_arima_transform_gradient(coef, arma)
@@ -489,7 +522,7 @@ function fit!(model::SARIMA{Fl}) where {Fl}
             if no_optim
                 var = zeros(0)
             else
-                hessian = numerical_hessian(p -> _armafn(p, true), res.minimizer)
+                hessian = finite_difference_hessian(p -> _armafn(p, true), res.minimizer)
                 var = inv(hessian * n_used)
             end
         end
