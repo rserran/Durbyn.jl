@@ -1,11 +1,4 @@
 # ─── ETS core state space recursion kernels ───────────────────────────────────
-#
-# Pure computational inner loops for the ETS state space model. Analogous to
-# core/kalman.jl in the ARIMA module: typed, standalone functions with no
-# closures, no parameter validation, and no model selection logic.
-#
-# Functions here operate on integer type codes (0=N, 1=A, 2=M) and pre-allocated
-# workspace arrays for zero-allocation hot paths.
 
 function construct_states(
     level::AbstractArray,

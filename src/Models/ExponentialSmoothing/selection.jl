@@ -1,8 +1,4 @@
 # ─── ETS model selection ──────────────────────────────────────────────────────
-#
-# Grid-based search over ETS model specifications, analogous to auto/search.jl
-# in the ARIMA module. Generates candidate models, fits each via etsmodel(),
-# and selects the best by information criterion.
 
 function validate_and_set_model_params(model, y, m, damped, restrict, additive_only)
 

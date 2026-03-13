@@ -1,8 +1,4 @@
 # ─── ETS state initialization ─────────────────────────────────────────────────
-#
-# Functions for computing initial level, trend, and seasonal states from the
-# observed series. Separated from the core recursion kernels to mirror the
-# ARIMA core pattern (covariance.jl / hyperparameters.jl for initial state setup).
 
 function handle_seasonality(y::AbstractVector, m::Integer, seasontype::String)
     n = length(y)

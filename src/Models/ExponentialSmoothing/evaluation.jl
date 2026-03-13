@@ -1,9 +1,4 @@
 # ─── Single ETS model evaluation ──────────────────────────────────────────────
-#
-# Functions for fitting a single ETS model specification: objective function,
-# optimizer wrapper, and the etsmodel() orchestrator that ties them together.
-# Analogous to auto/evaluation.jl in the ARIMA module: standalone functions
-# with explicit typed arguments for fitting one candidate model.
 
 function create_params(
     optimized_params::AbstractArray,

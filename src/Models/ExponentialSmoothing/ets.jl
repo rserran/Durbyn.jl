@@ -1,9 +1,4 @@
 # ─── ETS orchestrator ─────────────────────────────────────────────────────────
-#
-# Top-level entry point and orchestration for ETS model fitting. Analogous to
-# auto/auto_arima.jl: validates arguments, preprocesses data, dispatches to
-# model selection (ets_selection.jl) or single model fitting (ets_evaluation.jl),
-# and assembles the final EtsModel output.
 
 """
     ets(

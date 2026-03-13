@@ -1,8 +1,4 @@
 # ─── ETS parameter initialization, validation, and admissibility ──────────────
-#
-# Standalone functions for parameter bounds checking, initial parameter selection,
-# and admissibility testing (Hyndman et al. 2008). Separated from the core
-# recursion kernels to mirror the ARIMA core pattern (hyperparameters.jl).
 
 function normalize_parameter(param)
     if isnothing(param)
