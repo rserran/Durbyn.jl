@@ -712,7 +712,7 @@ function fit!(model::SARIMA{Fl}) where {Fl}
             opt = optimize(ml_fn, init[mask], optim_method;
                 param_scale = parscale[mask],
                 step_sizes = get(optim_control, "ndeps", nothing),
-                max_iterations = get(optim_control, "maxit", nothing))
+                max_iterations = get(optim_control, "maxit", 500))
             res = (converged=opt.converged, minimizer=opt.minimizer, minimum=opt.minimum)
         end
 

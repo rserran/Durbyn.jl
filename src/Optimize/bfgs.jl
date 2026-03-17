@@ -508,6 +508,9 @@ function bfgs(
         )
 
         if !accepted
+            # Line search could not find a point that improves the objective,
+            # which means we are at or very near a minimum.
+            converged = true
             break
         end
 
